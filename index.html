@@ -172,22 +172,19 @@
   .hub{ display:flex; flex-direction:column; align-items:center; gap:14px; padding-top:6px;}
   .hub-ring-wrap{ position:relative; width:230px; height:230px; }
   .hub-ring-wrap svg{ width:100%; height:100%; transform:rotate(-90deg); }
-  .hub-spinner{
-    position:absolute; inset:-16px; border-radius:50%; pointer-events:none;
-    border:1px solid var(--cyan);
-    animation: hub-heartbeat-ring 2.4s ease-out infinite;
+  .hub-ripple{ position:absolute; inset:-16px; border-radius:50%; pointer-events:none; }
+  .hub-ripple span{
+    position:absolute; inset:0; border-radius:50%;
+    border:1px solid var(--cyan); opacity:0;
+    animation: hub-ripple-flow 2.7s linear infinite;
   }
-  .hub-spinner::after{
-    content:''; position:absolute; inset:6px; border-radius:50%;
-    border:1px solid var(--cyan);
-    animation: hub-heartbeat-ring 2.4s ease-out infinite 0.1s;
-  }
-  @keyframes hub-heartbeat-ring{
-    0%{ transform:scale(0.84); opacity:0.9; }
-    13%{ transform:scale(1.04); opacity:0; }
-    13.1%{ transform:scale(0.84); opacity:0.75; }
-    26%{ transform:scale(1.16); opacity:0; }
-    26.1%, 100%{ transform:scale(0.84); opacity:0; }
+  .hub-ripple span:nth-child(1){ animation-delay:0s; }
+  .hub-ripple span:nth-child(2){ animation-delay:0.9s; }
+  .hub-ripple span:nth-child(3){ animation-delay:1.8s; }
+  @keyframes hub-ripple-flow{
+    0%{ transform:scale(0.72); opacity:0; }
+    12%{ opacity:0.7; }
+    100%{ transform:scale(1.28); opacity:0; }
   }
   .hub-track{ fill:none; stroke: rgba(111,227,236,0.12); stroke-width:2; }
   .hub-arc{ fill:none; stroke:var(--cyan); stroke-width:2; stroke-linecap:round; filter: drop-shadow(0 0 4px rgba(111,227,236,0.6)); }
@@ -197,6 +194,43 @@
   .hub-center .sub{ font-size:11px; color:var(--cyan-soft); }
   .hub-caption{ text-align:center; font-size:12px; color:var(--dim); letter-spacing:0.08em; max-width:220px; }
   .hub-caption strong{ color:var(--cyan); font-weight:600; }
+  .hub-holiday{ text-align:center; font-size:11px; color:var(--cyan-soft); margin-top:8px; letter-spacing:0.05em; }
+
+  /* ---------- ops log ---------- */
+  .ops-panel{ margin-top:var(--gap); }
+  .ops-input-row{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .ops-input{
+    flex:1; min-width:180px; background: rgba(111,227,236,0.04); border:1px solid var(--edge-bright);
+    color:var(--white); font-family:inherit; padding:8px 12px; border-radius:3px; font-size:13px;
+  }
+  .ops-input::placeholder{ color:var(--dim); }
+  .ops-input:focus{ outline:none; border-color:var(--cyan); }
+  .ops-entry{
+    display:flex; gap:12px; align-items:flex-start; padding:9px 4px; border-bottom:1px dashed rgba(111,227,236,0.12);
+    font-size:13px;
+  }
+  .ops-entry:last-child{ border-bottom:none; }
+  .ops-entry .ts{ color:var(--dim); font-size:11px; flex-shrink:0; white-space:nowrap; padding-top:1px; }
+  .ops-entry .txt{ flex:1; color:var(--white); word-break:break-word; }
+  .ops-entry .del{
+    background:none; border:none; color:var(--dim); cursor:pointer; font-size:14px; flex-shrink:0;
+    padding:0 4px; line-height:1;
+  }
+  .ops-entry .del:hover{ color:var(--red); }
+
+  /* ---------- command bar ---------- */
+  .cmd-bar{
+    display:flex; align-items:center; gap:8px; background: rgba(111,227,236,0.03);
+    border:1px solid var(--edge); border-radius:4px; padding:8px 12px; margin-bottom:10px;
+  }
+  .cmd-prompt{ color:var(--cyan); font-weight:700; flex-shrink:0; }
+  .cmd-input{
+    flex:1; background:none; border:none; color:var(--white); font-family:inherit;
+    font-size:13px; letter-spacing:0.02em;
+  }
+  .cmd-input::placeholder{ color:var(--dim); }
+  .cmd-input:focus{ outline:none; }
+  .cmd-output{ font-size:12px; color:var(--cyan-soft); margin: -4px 0 12px 4px; min-height:0; white-space:pre-line; }
 
   /* ---------- weather ---------- */
   .wx-current{ display:flex; align-items:center; gap:16px; margin-bottom:14px; }
@@ -211,6 +245,10 @@
   .wx-hourly .hr{ flex:0 0 auto; text-align:center; font-size:11px; color:var(--dim); min-width:38px;}
   .wx-hourly .hr .t{ color:var(--white); font-weight:600; margin-top:4px; }
   .wx-hourly .hr svg{ width:20px; height:20px; margin:4px auto 0; display:block; }
+  .sun-moon-row{ display:flex; gap:14px; margin-top:12px; padding-top:12px; border-top:1px solid var(--edge); flex-wrap:wrap; }
+  .sun-moon-row .item{ font-size:12px; }
+  .sun-moon-row .item .k{ color:var(--dim); display:block; letter-spacing:0.05em; font-size:10px; }
+  .sun-moon-row .item .v{ color:var(--white); font-weight:600; }
 
   /* ---------- mandaluyong city wireframe watermark ---------- */
   .wx-top-row{ display:flex; gap:14px; align-items:flex-start; }
@@ -226,6 +264,12 @@
     50%{ filter: drop-shadow(0 0 8px rgba(111,227,236,0.9)); stroke-opacity:1; }
   }
   .city-map-grid line{ stroke: var(--cyan); stroke-width:0.5; opacity:0.3; }
+  .city-map-sweep{ animation: sweep-rotate 4s linear infinite; transform-box: fill-box; }
+  @keyframes sweep-rotate{ from{ transform:rotate(0deg);} to{ transform:rotate(360deg);} }
+  .city-map-frame path{ fill:none; stroke:var(--cyan); stroke-width:1.4; opacity:0.85; }
+  .city-map-compass line, .city-map-compass path{ stroke:var(--cyan); stroke-width:1; fill:var(--cyan); opacity:0.8; }
+  .city-map-compass text{ fill:var(--cyan); font-family:'Chakra Petch', sans-serif; font-size:9px; font-weight:700; opacity:0.9; }
+  .city-map-coords{ fill:var(--dim); font-family:'Chakra Petch', sans-serif; font-size:6.5px; letter-spacing:0.03em; }
   .city-map-pin circle.core{
     fill:#fff; animation: heartbeat 1.4s ease-in-out infinite;
     transform-origin:center; transform-box: fill-box;
@@ -454,7 +498,7 @@
   .flood-hazard{ flex:1; min-width:200px; font-size:12px; color:var(--dim); line-height:1.6; }
   .flood-hazard .headline{ color:var(--white); font-weight:600; margin-bottom:4px; }
   .flood-news{ margin-top:14px; padding-top:12px; border-top:1px solid var(--edge); }
-  .flood-news .label{ font-size:10px; letter-spacing:0.12em; color:var(--dim); margin-bottom:8px; }
+  .flood-news .label{ font-size:10px; letter-spacing:0.1A2em; color:var(--dim); margin-bottom:8px; }
   .flood-news-item{
     display:block; font-size:12px; color:var(--white); padding:6px 0; border-bottom:1px dashed rgba(111,227,236,0.12);
     text-decoration:none;
@@ -490,7 +534,6 @@
   .su-legend span{ display:inline-flex; align-items:center; gap:5px; }
   .su-legend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
 
-  footer{ text-align:center; color:var(--dim); font-size:11px; letter-spacing:0.1em; margin-top:34px; }
 </style>
 </head>
 <body>
@@ -523,6 +566,12 @@
     </div>
   </header>
 
+  <div class="cmd-bar">
+    <span class="cmd-prompt">&gt;</span>
+    <input type="text" id="cmdInput" class="cmd-input" placeholder="Type a command… try /help" autocomplete="off">
+  </div>
+  <div class="cmd-output" id="cmdOutput"></div>
+
   <div class="alert-banner" id="alertBanner"></div>
 
   <div class="grid">
@@ -545,7 +594,7 @@
     <section class="panel hub" aria-labelledby="hubHead">
       <h2 id="hubHead" style="align-self:flex-start;">CORE STATUS</h2>
       <div class="hub-ring-wrap">
-        <div class="hub-spinner" aria-hidden="true"></div>
+        <div class="hub-ripple" aria-hidden="true"><span></span><span></span><span></span></div>
         <svg viewBox="0 0 230 230">
           <circle class="hub-track" cx="115" cy="115" r="100"></circle>
           <circle class="hub-arc" id="hubArc" cx="115" cy="115" r="100" stroke-dasharray="628" stroke-dashoffset="628"></circle>
@@ -557,6 +606,7 @@
         </div>
       </div>
       <div class="hub-caption">Monitoring <strong>weather</strong>, <strong>device diagnostics</strong>, and <strong>live Philippine headlines</strong> in real time.</div>
+      <div class="hub-holiday" id="hubHoliday"></div>
     </section>
 
     <!-- WEATHER -->
@@ -568,12 +618,16 @@
         </div>
         <div class="city-map-wrap" aria-hidden="true">
           <svg viewBox="0 0 213.6 170">
-            <path class="city-map-outline" d="M210.6,3.6 L211.7,18.5 L199.6,59.1 L211.4,53.3 L213.6,98.4 L205.7,94.8 L195.5,113.1 L200.9,117.5 L194.1,125.5 L198.9,140.9 L174.5,153.6 L166.7,153.4 L146.6,165.6 L132.2,163.8 L88.1,170.0 L48.8,138.2 L0.0,106.9 L0.9,98.7 L36.9,49.6 L47.0,27.2 L70.0,37.4 L72.5,44.4 L86.6,53.3 L129.8,39.2 L171.5,1.5 L194.1,4.5 L209.3,0.0 L210.6,3.6 Z"></path>
             <defs>
               <clipPath id="cityClip">
                 <path d="M210.6,3.6 L211.7,18.5 L199.6,59.1 L211.4,53.3 L213.6,98.4 L205.7,94.8 L195.5,113.1 L200.9,117.5 L194.1,125.5 L198.9,140.9 L174.5,153.6 L166.7,153.4 L146.6,165.6 L132.2,163.8 L88.1,170.0 L48.8,138.2 L0.0,106.9 L0.9,98.7 L36.9,49.6 L47.0,27.2 L70.0,37.4 L72.5,44.4 L86.6,53.3 L129.8,39.2 L171.5,1.5 L194.1,4.5 L209.3,0.0 L210.6,3.6 Z"></path>
               </clipPath>
+              <radialGradient id="sweepGrad" gradientUnits="userSpaceOnUse" cx="143.9" cy="79.8" r="140">
+                <stop offset="0%" stop-color="#fff" stop-opacity="0.5"></stop>
+                <stop offset="100%" stop-color="#fff" stop-opacity="0"></stop>
+              </radialGradient>
             </defs>
+            <path class="city-map-outline" d="M210.6,3.6 L211.7,18.5 L199.6,59.1 L211.4,53.3 L213.6,98.4 L205.7,94.8 L195.5,113.1 L200.9,117.5 L194.1,125.5 L198.9,140.9 L174.5,153.6 L166.7,153.4 L146.6,165.6 L132.2,163.8 L88.1,170.0 L48.8,138.2 L0.0,106.9 L0.9,98.7 L36.9,49.6 L47.0,27.2 L70.0,37.4 L72.5,44.4 L86.6,53.3 L129.8,39.2 L171.5,1.5 L194.1,4.5 L209.3,0.0 L210.6,3.6 Z"></path>
             <g class="city-map-grid" clip-path="url(#cityClip)">
               <title>Stylized grid overlay — decorative only, not actual street data</title>
               <line x1="0.0" y1="0" x2="0.0" y2="170"></line>
@@ -606,6 +660,11 @@
               <line x1="0" y1="154.0" x2="213.6" y2="154.0"></line>
               <line x1="0" y1="168.0" x2="213.6" y2="168.0"></line>
             </g>
+            <g clip-path="url(#cityClip)">
+              <g class="city-map-sweep" transform-origin="143.9 79.8">
+                <path d="M143.9,79.8 L143.9,-60 A140,140 0 0,1 264,10 Z" fill="url(#sweepGrad)"></path>
+              </g>
+            </g>
             <g class="city-map-pin" transform="translate(143.9,79.8)">
               <line class="crosshair" x1="-9" y1="0" x2="9" y2="0"></line>
               <line class="crosshair" x1="0" y1="-9" x2="0" y2="9"></line>
@@ -614,6 +673,18 @@
               <circle class="core" r="3.6"></circle>
               <title>Mandaluyong City Hall (approx.)</title>
             </g>
+            <g class="city-map-frame">
+              <path d="M2,16 L2,2 L16,2"></path>
+              <path d="M197.6,2 L211.6,2 L211.6,16"></path>
+              <path d="M211.6,154 L211.6,168 L197.6,168"></path>
+              <path d="M16,168 L2,168 L2,154"></path>
+            </g>
+            <g class="city-map-compass" transform="translate(196,20)">
+              <line x1="0" y1="6" x2="0" y2="-6"></line>
+              <path d="M0,-6 L-2.5,-1 L2.5,-1 Z"></path>
+              <text x="0" y="16" text-anchor="middle">N</text>
+            </g>
+            <text class="city-map-coords" x="6" y="164">14.577°N 121.034°E</text>
           </svg>
         </div>
       </div>
@@ -797,7 +868,17 @@
     </div>
   </section>
 
-  <footer>ODDYSEUS INTERFACE — BUILT FOR DK · CPDD MANDALUYONG — NOT AFFILIATED WITH MARVEL OR STARK INDUSTRIES</footer>
+  <!-- OPS LOG -->
+  <section class="panel ops-panel" aria-labelledby="opsHead">
+    <h2 id="opsHead">OPS LOG <small>SAVED LOCALLY ON THIS DEVICE</small></h2>
+    <div class="ops-input-row">
+      <input type="text" id="opsInput" class="ops-input" placeholder="Log an observation… e.g. Flooding observed EDSA-Shaw" maxlength="240">
+      <button class="retry-btn" id="opsAddBtn">LOG</button>
+      <button class="btn-outline" id="opsExportBtn">EXPORT</button>
+    </div>
+    <div id="opsList"></div>
+  </section>
+
 </div>
 
 <!-- MODAL -->
@@ -1065,7 +1146,7 @@
   var geo = { lat: 14.5794, lng: 121.0359, label: 'MANDALUYONG CITY', source: 'DEFAULT' };
 
   function loadWeather(){
-    var url = 'https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lng+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&hourly=temperature_2m,weather_code&timezone=Asia%2FManila&forecast_days=1';
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lng+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&hourly=temperature_2m,weather_code&daily=sunrise,sunset&timezone=Asia%2FManila&forecast_days=1';
     document.getElementById('wxPlace').textContent = geo.label;
     fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(d){
@@ -1092,7 +1173,8 @@
           '<div class="item"><span class="k">HUMIDITY</span><span class="v">'+cur.relative_humidity_2m+'%</span></div>' +
           '<div class="item"><span class="k">WIND</span><span class="v">'+Math.round(cur.wind_speed_10m)+' km/h</span></div>' +
         '</div>' +
-        '<div class="wx-hourly">'+hoursHtml+'</div>';
+        '<div class="wx-hourly">'+hoursHtml+'</div>' +
+        (d.daily && d.daily.sunrise ? buildSunMoonRow(d.daily.sunrise[0], d.daily.sunset[0]) : '');
 
       updateFloodRisk(cur.precipitation || 0);
     })
@@ -1104,6 +1186,29 @@
       if(wr) wr.addEventListener('click', loadWeather);
     });
     loadAQI();
+  }
+
+  /* ---------- sunrise/sunset + moon phase (moon phase computed locally, no API) ---------- */
+  function getMoonPhase(date){
+    var knownNewMoon = Date.UTC(2000,0,6,18,14,0);
+    var synodicMonth = 29.53058867;
+    var diffDays = (date.getTime() - knownNewMoon) / 86400000;
+    var phase = (diffDays % synodicMonth) / synodicMonth;
+    if(phase < 0) phase += 1;
+    var illum = Math.round((1 - Math.cos(2*Math.PI*phase)) / 2 * 100);
+    var names = ['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
+    var icons = ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
+    var idx = Math.round(phase*8) % 8;
+    return { name:names[idx], icon:icons[idx], illum:illum };
+  }
+  function buildSunMoonRow(sunriseISO, sunsetISO){
+    var fmt = function(iso){ return new Date(iso).toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', hour12:true }); };
+    var moon = getMoonPhase(new Date());
+    return '<div class="sun-moon-row">' +
+      '<div class="item"><span class="k">SUNRISE</span><span class="v">☀ ' + fmt(sunriseISO) + '</span></div>' +
+      '<div class="item"><span class="k">SUNSET</span><span class="v">☀ ' + fmt(sunsetISO) + '</span></div>' +
+      '<div class="item"><span class="k">MOON</span><span class="v">' + moon.icon + ' ' + moon.name + ' · ' + moon.illum + '%</span></div>' +
+      '</div>';
   }
 
   /* ---------- rainfall & flood risk (computed live, PAGASA color-code criteria) ---------- */
@@ -1338,6 +1443,29 @@
     });
   }
   loadPagasa();
+
+  /* ---------- PH public holiday tracker (Nager.Date, free & keyless) ---------- */
+  function loadHolidays(){
+    var year = new Date().getFullYear();
+    Promise.all([
+      fetch('https://date.nager.at/api/v3/PublicHolidays/'+year+'/PH').then(function(r){ return r.ok ? r.json() : []; }),
+      fetch('https://date.nager.at/api/v3/PublicHolidays/'+(year+1)+'/PH').then(function(r){ return r.ok ? r.json() : []; })
+    ]).then(function(results){
+      var all = results[0].concat(results[1]);
+      var today = new Date(); today.setHours(0,0,0,0);
+      var upcoming = all
+        .map(function(h){ return { name:h.localName, date:new Date(h.date+'T00:00:00') }; })
+        .filter(function(h){ return h.date >= today; })
+        .sort(function(a,b){ return a.date - b.date; });
+      var el = document.getElementById('hubHoliday');
+      if(!upcoming.length){ el.textContent = ''; return; }
+      var next = upcoming[0];
+      var daysUntil = Math.round((next.date - today) / 86400000);
+      var when = daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : 'in ' + daysUntil + ' days';
+      el.textContent = 'Next PH holiday: ' + next.name + ' — ' + when;
+    }).catch(function(){ document.getElementById('hubHoliday').textContent = ''; });
+  }
+  loadHolidays();
   setInterval(loadPagasa, 15*60*1000);
 
   /* ---------- news ---------- */
@@ -1348,15 +1476,16 @@
     inquirer: { url: 'https://www.inquirer.net/fullfeed', label: 'SOURCE: INQUIRER' }
   };
   var currentSrc = 'rappler';
+  function switchNewsSource(key){
+    if(!FEEDS[key] || key === currentSrc) return;
+    currentSrc = key;
+    document.querySelectorAll('.src-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.src === key); });
+    document.getElementById('newsSourceLabel').textContent = FEEDS[currentSrc].label;
+    document.getElementById('newsBody').innerHTML = '<div class="news-status">Establishing uplink…</div>';
+    loadNews();
+  }
   document.querySelectorAll('.src-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      if(btn.dataset.src === currentSrc) return;
-      currentSrc = btn.dataset.src;
-      document.querySelectorAll('.src-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
-      document.getElementById('newsSourceLabel').textContent = FEEDS[currentSrc].label;
-      document.getElementById('newsBody').innerHTML = '<div class="news-status">Establishing uplink…</div>';
-      loadNews();
-    });
+    btn.addEventListener('click', function(){ switchNewsSource(btn.dataset.src); });
   });
 
   function stripHtml(html){
@@ -1454,6 +1583,122 @@
   loadNews();
   setInterval(loadNews, 10*60*1000); // refresh every 10 min
   setInterval(loadWeather, 10*60*1000);
+
+  /* ---------- ops log (persisted in this browser's localStorage) ---------- */
+  (function initOpsLog(){
+    var STORAGE_KEY = 'oddyseus-ops-log';
+    var listEl = document.getElementById('opsList');
+    var inputEl = document.getElementById('opsInput');
+    if(!listEl || !inputEl) return;
+
+    function load(){
+      try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+      catch(e){ return []; }
+    }
+    function save(entries){
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+      catch(e){ console.error('ODDYSEUS ops log save failed:', e); }
+    }
+    function fmtTs(iso){
+      var d = new Date(iso);
+      return d.toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+    }
+    function render(){
+      var entries = load();
+      if(!entries.length){
+        listEl.innerHTML = '<div class="news-status">No entries yet — log an observation above.</div>';
+        return;
+      }
+      listEl.innerHTML = entries.map(function(e, i){
+        return '<div class="ops-entry">' +
+          '<span class="ts">' + fmtTs(e.ts) + '</span>' +
+          '<span class="txt"></span>' +
+          '<button class="del" data-idx="' + i + '" aria-label="Delete entry">✕</button>' +
+          '</div>';
+      }).join('');
+      // set text via textContent per row to avoid any HTML injection from logged text
+      var rows = listEl.querySelectorAll('.ops-entry .txt');
+      rows.forEach(function(el, i){ el.textContent = entries[i].text; });
+      listEl.querySelectorAll('.del').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var entries2 = load();
+          entries2.splice(+btn.dataset.idx, 1);
+          save(entries2);
+          render();
+        });
+      });
+    }
+    function addEntry(){
+      var text = inputEl.value.trim();
+      if(!text) return;
+      var entries = load();
+      entries.unshift({ ts: new Date().toISOString(), text: text });
+      save(entries);
+      inputEl.value = '';
+      render();
+    }
+    document.getElementById('opsAddBtn').addEventListener('click', addEntry);
+    inputEl.addEventListener('keydown', function(e){ if(e.key === 'Enter') addEntry(); });
+    document.getElementById('opsExportBtn').addEventListener('click', function(){
+      var entries = load();
+      var text = entries.map(function(e){ return fmtTs(e.ts) + ' — ' + e.text; }).join('\n');
+      var blob = new Blob([text || 'No entries.'], { type:'text/plain' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'oddyseus-ops-log-' + new Date().toISOString().slice(0,10) + '.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+    render();
+  })();
+
+  /* ---------- command bar ---------- */
+  (function initCommandBar(){
+    var input = document.getElementById('cmdInput');
+    var output = document.getElementById('cmdOutput');
+    if(!input) return;
+
+    function say(msg){ output.textContent = msg; }
+    function scrollToPanel(headingId){
+      var el = document.getElementById(headingId);
+      if(el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+
+    var HELP_TEXT = 'Commands: /weather · /news [rappler|gma|inquirer] · /seismic · /pagasa · /traffic · /refresh · /clear · /help';
+
+    var COMMANDS = {
+      help: function(){ say(HELP_TEXT); },
+      weather: function(){ loadWeather(); scrollToPanel('wxHead'); say('Refreshing weather…'); },
+      seismic: function(){ loadSeismic(); scrollToPanel('seismicHead'); say('Refreshing seismic feed…'); },
+      pagasa: function(){ loadPagasa(); scrollToPanel('pagasaHead'); say('Refreshing PAGASA advisory…'); },
+      traffic: function(){ openTraffic(); say('Opening traffic overlay…'); },
+      news: function(arg){
+        if(arg && FEEDS[arg]){ switchNewsSource(arg); scrollToPanel('newsHead'); say('Switched news source to ' + arg.toUpperCase() + '.'); }
+        else if(arg){ say('Unknown news source "' + arg + '". Try: rappler, gma, inquirer.'); }
+        else { loadNews(); scrollToPanel('newsHead'); say('Refreshing ' + currentSrc.toUpperCase() + ' headlines…'); }
+      },
+      refresh: function(){
+        loadWeather(); loadSeismic(); loadPagasa(); loadNews(); loadHolidays();
+        say('Refreshing all live panels…');
+      },
+      clear: function(){ say(''); }
+    };
+
+    input.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      var raw = input.value.trim();
+      input.value = '';
+      if(!raw) return;
+      if(raw[0] !== '/'){ say('Commands start with "/" — try /help.'); return; }
+      var parts = raw.slice(1).toLowerCase().split(/\s+/);
+      var cmd = parts[0], arg = parts[1];
+      if(COMMANDS[cmd]){ COMMANDS[cmd](arg); }
+      else { say('Unknown command "/' + cmd + '". Try /help.'); }
+    });
+  })();
 
 })();
 </script>
