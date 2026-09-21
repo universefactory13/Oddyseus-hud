@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ODDYSEUS — Diagnostic Interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#04070a;
+    --panel:#0a1418;
+    --panel-2:#0d1a1f;
+    --edge: rgba(111,227,236,0.18);
+    --edge-bright: rgba(111,227,236,0.55);
+    --cyan:#6fe3ec;
+    --cyan-soft:#3f9aa3;
+    --cyan-dim:#1f4247;
+    --white:#eaf7f8;
+    --dim:#5e838a;
+    --red:#ff4d4d;
+    --amber:#ffb454;
+    --gap: 16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at 50% -10%, #0b1c21 0%, #04070a 55%, #020304 100%);
+    color: var(--white);
+    font-family: 'Chakra Petch', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  /* ---------- background grid + scan ---------- */
+  .code-rain{
+    position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+    display:flex; opacity:0.14; color:var(--cyan); mix-blend-mode:screen;
+    mask-image: radial-gradient(ellipse at 50% 30%, black 0%, transparent 78%);
+  }
+  .code-col{ flex:1; overflow:hidden; min-width:0; }
+  .code-col pre{
+    margin:0; font-family:'Chakra Petch', monospace; font-size:10.5px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-all; padding:0 6px;
+  }
+  .code-col .track{ animation: code-scroll linear infinite; }
+  .code-col.rev .track{ animation-direction:reverse; }
+  @keyframes code-scroll{ from{ transform:translateY(0);} to{ transform:translateY(-50%);} }
+  .bg-grid{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background-image:
+      linear-gradient(var(--edge) 1px, transparent 1px),
+      linear-gradient(90deg, var(--edge) 1px, transparent 1px);
+    background-size: 42px 42px;
+    opacity:0.12;
+    mask-image: radial-gradient(ellipse at 50% 20%, black 0%, transparent 75%);
+  }
+  .scan-line{
+    position:fixed; left:0; right:0; height:2px; z-index:2; pointer-events:none;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity:0.5; filter: blur(0.5px);
+    animation: scan 6s linear infinite;
+  }
+  @keyframes scan{
+    0%{ top:-2%; opacity:0;}
+    5%{opacity:0.5;}
+    95%{opacity:0.5;}
+    100%{ top:102%; opacity:0;}
+  }
+
+  /* ---------- boot sequence ---------- */
+  #boot{
+    position:fixed; inset:0; z-index:50; background:var(--void);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    gap:18px;
+    animation: boot-fade 0.6s ease-out 2.6s forwards;
+  }
+  #boot.skip{display:none;}
+  @keyframes boot-fade{ to{opacity:0; visibility:hidden;} }
+  .boot-ring{
+    width:120px; height:120px; border-radius:50%;
+    border:1px solid var(--cyan-dim);
+    border-top-color:var(--cyan);
+    animation: spin 1.4s linear infinite;
+    position:relative;
+  }
+  .boot-ring::after{
+    content:''; position:absolute; inset:14px; border-radius:50%;
+    border:1px solid var(--cyan-dim); border-bottom-color: var(--cyan);
+    animation: spin 2.1s linear infinite reverse;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .boot-word{
+    font-family:'Orbitron', sans-serif; font-weight:700; letter-spacing:0.28em;
+    font-size:clamp(22px, 5.5vw, 40px); color:var(--cyan);
+    text-shadow: 0 0 18px rgba(111,227,236,0.55);
+    padding-left:0.28em; /* optical centering for letter-spacing */
+  }
+  .boot-sub{ color:var(--dim); font-size:13px; letter-spacing:0.3em; }
+  .boot-bar{ width:220px; height:2px; background:var(--cyan-dim); position:relative; overflow:hidden; border-radius:2px;}
+  .boot-bar::after{
+    content:''; position:absolute; inset:0; background:var(--cyan);
+    animation: fill 2.4s ease-in-out forwards;
+    transform-origin:left;
+  }
+  @keyframes fill{ from{transform:scaleX(0);} to{transform:scaleX(1);} }
+
+  /* ---------- layout ---------- */
+  .wrap{ position:relative; z-index:3; max-width:1240px; margin:0 auto; padding: 22px 20px 60px; }
+
+  header.topbar{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+    padding-bottom:16px; border-bottom:1px solid var(--edge); margin-bottom:22px;
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:baseline; gap:14px; }
+  .brand h1{
+    font-family:'Orbitron', sans-serif; font-weight:700; font-size:28px; letter-spacing:0.28em;
+    margin:0; color:var(--white);
+  }
+  .brand h1 span{ color:var(--cyan); }
+  .brand .tagline{ color:var(--dim); font-size:11px; letter-spacing:0.15em; }
+  .status-pill{
+    display:flex; align-items:center; gap:8px; border:1px solid var(--edge-bright);
+    padding:5px 12px 5px 9px; border-radius:3px; font-size:12px; letter-spacing:0.12em; color:var(--cyan);
+  }
+  .status-dot{ width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .clock-block{ text-align:right; }
+  .clock-time{ font-size:32px; font-weight:600; line-height:1; letter-spacing:0.04em; }
+  .clock-date{ color:var(--dim); font-size:12px; letter-spacing:0.1em; margin-top:4px; }
+
+  .grid{
+    display:grid; grid-template-columns: 1fr 1.15fr 1fr; gap:var(--gap);
+    align-items:start;
+  }
+  @media (max-width: 880px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--edge); border-radius:4px; padding:18px 18px 20px;
+    position:relative;
+  }
+  .panel::before{
+    content:''; position:absolute; top:-1px; left:14px; right:14px; height:1px;
+    background: linear-gradient(90deg, transparent, var(--edge-bright), transparent);
+  }
+  .panel h2{
+    font-size:12px; letter-spacing:0.2em; color:var(--cyan); margin:0 0 14px;
+    display:flex; align-items:center; justify-content:space-between; font-weight:600;
+  }
+  .panel h2 small{ color:var(--dim); font-weight:400; letter-spacing:0.08em; }
+
+  /* ---------- diagnostics ---------- */
+  .diag-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:8px 0; border-bottom:1px dashed rgba(111,227,236,0.12);
+    font-size:13px;
+  }
+  .diag-row:last-child{ border-bottom:none; }
+  .diag-label{ color:var(--dim); letter-spacing:0.04em; }
+  .diag-value{ color:var(--white); font-weight:600; letter-spacing:0.03em; }
+  .diag-value.good{ color:var(--cyan); }
+  .diag-value.warn{ color:var(--amber); }
+
+  /* ---------- central hub ---------- */
+  .hub{ display:flex; flex-direction:column; align-items:center; gap:14px; padding-top:6px;}
+  .hub-ring-wrap{ position:relative; width:230px; height:230px; }
+  .hub-ring-wrap svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .hub-spinner{
+    position:absolute; inset:-16px; border-radius:50%; pointer-events:none;
+    border:1px solid var(--cyan);
+    animation: hub-heartbeat-ring 2.4s ease-out infinite;
+  }
+  .hub-spinner::after{
+    content:''; position:absolute; inset:6px; border-radius:50%;
+    border:1px solid var(--cyan);
+    animation: hub-heartbeat-ring 2.4s ease-out infinite 0.1s;
+  }
+  @keyframes hub-heartbeat-ring{
+    0%{ transform:scale(0.84); opacity:0.9; }
+    13%{ transform:scale(1.04); opacity:0; }
+    13.1%{ transform:scale(0.84); opacity:0.75; }
+    26%{ transform:scale(1.16); opacity:0; }
+    26.1%, 100%{ transform:scale(0.84); opacity:0; }
+  }
+  .hub-track{ fill:none; stroke: rgba(111,227,236,0.12); stroke-width:2; }
+  .hub-arc{ fill:none; stroke:var(--cyan); stroke-width:2; stroke-linecap:round; filter: drop-shadow(0 0 4px rgba(111,227,236,0.6)); }
+  .hub-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+  .hub-center .label{ font-size:10px; letter-spacing:0.2em; color:var(--dim); }
+  .hub-center .value{ font-size:26px; font-weight:700; color:var(--white); }
+  .hub-center .sub{ font-size:11px; color:var(--cyan-soft); }
+  .hub-caption{ text-align:center; font-size:12px; color:var(--dim); letter-spacing:0.08em; max-width:220px; }
+  .hub-caption strong{ color:var(--cyan); font-weight:600; }
+
+  /* ---------- weather ---------- */
+  .wx-current{ display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+  .wx-temp{ font-size:44px; font-weight:700; line-height:1; }
+  .wx-desc{ color:var(--dim); font-size:13px; margin-top:4px; }
+  .wx-icon{ width:52px; height:52px; flex-shrink:0; }
+  .wx-meta{ display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-bottom:14px; }
+  .wx-meta .item{ font-size:12px; }
+  .wx-meta .item .k{ color:var(--dim); display:block; letter-spacing:0.05em;}
+  .wx-meta .item .v{ color:var(--white); font-weight:600; }
+  .wx-hourly{ display:flex; gap:6px; overflow-x:auto; padding-top:8px; border-top:1px solid var(--edge); }
+  .wx-hourly .hr{ flex:0 0 auto; text-align:center; font-size:11px; color:var(--dim); min-width:38px;}
+  .wx-hourly .hr .t{ color:var(--white); font-weight:600; margin-top:4px; }
+  .wx-hourly .hr svg{ width:20px; height:20px; margin:4px auto 0; display:block; }
+
+  /* ---------- mandaluyong city wireframe watermark ---------- */
+  .wx-top-row{ display:flex; gap:14px; align-items:flex-start; }
+  .wx-top-row > div:first-child{ flex:1; min-width:0; }
+  .city-map-wrap{ flex-shrink:0; width:150px; opacity:1; pointer-events:none; margin-top:2px; }
+  .city-map-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .city-map-outline{
+    fill: rgba(111,227,236,0.1); stroke: var(--cyan); stroke-width:2.4;
+    animation: city-pulse 2.8s ease-in-out infinite;
+  }
+  @keyframes city-pulse{
+    0%,100%{ filter: drop-shadow(0 0 2px rgba(111,227,236,0.35)); stroke-opacity:0.75; }
+    50%{ filter: drop-shadow(0 0 8px rgba(111,227,236,0.9)); stroke-opacity:1; }
+  }
+  .city-map-grid line{ stroke: var(--cyan); stroke-width:0.5; opacity:0.3; }
+  .city-map-pin circle.core{
+    fill:#fff; animation: heartbeat 1.4s ease-in-out infinite;
+    transform-origin:center; transform-box: fill-box;
+    filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px var(--cyan));
+  }
+  .city-map-pin circle.ring{
+    fill:none; stroke:var(--cyan); stroke-width:2.4; opacity:0.9;
+    animation: sweep-ring 1.4s ease-out infinite;
+    transform-origin:center; transform-box: fill-box;
+  }
+  .city-map-pin circle.ring2{
+    fill:none; stroke:#fff; stroke-width:1.6; opacity:0.9;
+    animation: sweep-ring 1.4s ease-out infinite 0.4s;
+    transform-origin:center; transform-box: fill-box;
+  }
+  .city-map-pin line.crosshair{
+    stroke:#fff; stroke-width:0.8; opacity:0.9;
+    filter: drop-shadow(0 0 2px #fff);
+  }
+
+  /* ---------- news ---------- */
+  .news-panel{ margin-top:var(--gap); }
+  .news-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; }
+  .news-card{
+    background: rgba(111,227,236,0.03); border:1px solid var(--edge); border-radius:4px;
+    padding:13px 14px; cursor:pointer; text-align:left; font-family:inherit; color:inherit;
+    display:flex; flex-direction:column; gap:8px; transition: border-color .15s, background .15s;
+  }
+  .news-card:hover, .news-card:focus-visible{ border-color:var(--edge-bright); background: rgba(111,227,236,0.07); outline:none; }
+  .news-card .src{ font-size:10px; letter-spacing:0.15em; color:var(--cyan); text-transform:uppercase; display:flex; align-items:center; gap:6px;}
+  .news-card .src::before{ content:'▶'; font-size:8px; }
+  .news-card h3{ font-size:14px; line-height:1.35; margin:0; font-weight:600; color:var(--white); }
+  .news-card .when{ font-size:11px; color:var(--dim); margin-top:auto; }
+  .news-status{ color:var(--dim); font-size:13px; padding:10px 2px; }
+  .retry-btn{
+    background:none; border:1px solid var(--edge-bright); color:var(--cyan); font-family:inherit;
+    padding:6px 14px; font-size:12px; letter-spacing:0.08em; cursor:pointer; border-radius:3px; margin-top:8px;
+  }
+  .retry-btn:hover{ background: rgba(111,227,236,0.08); }
+
+  /* ---------- modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(2,4,5,0.86); backdrop-filter: blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:60; padding:24px;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    background: var(--panel); border:1px solid var(--edge-bright); border-radius:6px;
+    max-width:720px; width:100%; max-height:88vh; overflow-y:auto; padding:0;
+    box-shadow: 0 0 60px rgba(111,227,236,0.12);
+  }
+  .modal-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:18px 20px 12px; border-bottom:1px solid var(--edge); }
+  .modal-head h3{ font-size:16px; line-height:1.4; margin:0; font-weight:600; }
+  .modal-close{
+    background:none; border:1px solid var(--edge); color:var(--dim); width:28px; height:28px; border-radius:3px;
+    cursor:pointer; flex-shrink:0; font-size:14px; line-height:1;
+  }
+  .modal-close:hover{ color:var(--white); border-color:var(--edge-bright); }
+  .modal-body{ padding:16px 20px 20px; }
+  .modal-body p{ font-size:13px; line-height:1.6; color:#c4dbde; }
+  .video-wrap{ position:relative; width:100%; padding-top:56.25%; margin:14px 0; border:1px solid var(--edge); border-radius:4px; overflow:hidden; background:#000;}
+  .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .video-note{ font-size:11px; color:var(--dim); letter-spacing:0.02em; display:flex; gap:6px; align-items:flex-start; }
+  .video-note::before{ content:'ⓘ'; color:var(--cyan-soft); flex-shrink:0; }
+  .modal-link{ display:inline-block; margin-top:10px; color:var(--cyan); font-size:13px; text-decoration:none; border-bottom:1px solid var(--cyan-soft); }
+  .modal-link:hover{ color:var(--white); }
+
+  /* ---------- modal entrance animation (bound to .open so JS can replay it) ---------- */
+  .modal-backdrop.open .modal{ animation: modal-in 0.32s cubic-bezier(.2,.8,.2,1); transform-origin:center; }
+  @keyframes modal-in{
+    0%{ opacity:0; transform: scale(0.9) translateY(10px); filter: blur(2px); }
+    60%{ opacity:1; filter:blur(0); }
+    100%{ opacity:1; transform: scale(1) translateY(0); }
+  }
+  .modal-backdrop.open .modal::before{
+    content:''; position:absolute; inset:0; pointer-events:none; border-radius:6px;
+    box-shadow: inset 0 0 0 1px var(--cyan); opacity:0.9;
+    animation: modal-flash 0.5s ease-out forwards;
+  }
+  @keyframes modal-flash{ 0%{ opacity:0.9;} 100%{ opacity:0;} }
+
+  /* ---------- topbar action button ---------- */
+  .btn-outline{
+    display:inline-flex; align-items:center; gap:7px; background:none; cursor:pointer;
+    border:1px solid var(--edge-bright); color:var(--cyan); font-family:inherit;
+    padding:7px 13px; font-size:11px; letter-spacing:0.14em; border-radius:3px;
+  }
+  .btn-outline:hover{ background: rgba(111,227,236,0.08); }
+  .btn-outline svg{ width:13px; height:13px; }
+
+  /* ---------- news source picker ---------- */
+  .src-picker{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .src-btn{
+    background:none; border:1px solid var(--edge); color:var(--dim); font-family:inherit;
+    padding:6px 13px; font-size:11px; letter-spacing:0.1em; cursor:pointer; border-radius:3px;
+  }
+  .src-btn:hover{ border-color:var(--edge-bright); color:var(--white); }
+  .src-btn.active{ border-color:var(--cyan); color:var(--cyan); background: rgba(111,227,236,0.08); }
+
+  /* ---------- pagasa panel ---------- */
+  .pagasa-panel{ margin-top:var(--gap); }
+  .pagasa-body{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .pagasa-badge{
+    flex-shrink:0; border:1px solid var(--edge-bright); border-radius:3px; padding:8px 14px;
+    text-align:center; min-width:110px;
+  }
+  .pagasa-badge .n{ font-size:22px; font-weight:700; color:var(--cyan); line-height:1; }
+  .pagasa-badge .l{ font-size:10px; color:var(--dim); letter-spacing:0.1em; margin-top:4px; }
+  .pagasa-text{ flex:1; min-width:220px; font-size:13px; line-height:1.6; color:#c4dbde; }
+  .pagasa-text a{ color:var(--cyan); }
+
+  /* ---------- traffic modal ---------- */
+  .traffic-modal .modal{ max-width:900px; }
+  .traffic-modal .map-wrap{ position:relative; width:100%; padding-top:62%; border:1px solid var(--edge); border-radius:4px; overflow:hidden; }
+  .traffic-modal .map-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; filter: grayscale(0.15) contrast(1.05); }
+
+  /* ---------- severe weather alert banner ---------- */
+  .alert-banner{
+    display:none; flex-direction:column; gap:8px; background: rgba(255,77,77,0.1);
+    border:1px solid var(--red); color:#ffdcdc; padding:10px 16px; border-radius:4px;
+    font-size:12px; letter-spacing:0.04em; margin-bottom:16px;
+  }
+  .alert-banner.show{ display:flex; animation: alert-pulse 1.8s ease-in-out infinite; }
+  @keyframes alert-pulse{ 0%,100%{ box-shadow:0 0 0 rgba(255,77,77,0.0);} 50%{ box-shadow:0 0 16px rgba(255,77,77,0.45);} }
+  .alert-line{ display:flex; align-items:center; gap:10px; }
+  .alert-line .dot{ width:8px; height:8px; border-radius:50%; background:var(--red); flex-shrink:0; box-shadow:0 0 8px var(--red); }
+  .alert-line strong{ color:#fff; letter-spacing:0.1em; margin-right:4px; }
+  .alert-line a{ color:#fff; margin-left:auto; flex-shrink:0; font-size:11px; text-decoration:underline; }
+
+  /* ---------- seismic map ---------- */
+  .seismic-panel{ margin-top:var(--gap); }
+  .seismic-body{ display:flex; gap:20px; flex-wrap:wrap; }
+  .seismic-map-wrap{ position:relative; flex:0 0 auto; width:210px; }
+  .seismic-map-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .ph-outline{ fill: rgba(111,227,236,0.05); stroke: var(--cyan-soft); stroke-width:1; }
+  .eq-pin{ cursor:pointer; }
+  .eq-pin circle.core{ fill:var(--amber); stroke:#000; stroke-width:0.4; }
+  .eq-pin circle.ring{ fill:none; stroke:var(--amber); stroke-width:1; opacity:0.7; animation: ping 2.2s ease-out infinite; }
+  .eq-pin.major circle.core{ fill:var(--red); }
+  .eq-pin.major circle.ring{ stroke:var(--red); }
+  @keyframes ping{ 0%{ r:3; opacity:0.8;} 100%{ r:11; opacity:0;} }
+
+  /* ---------- latest-quake heartbeat ---------- */
+  .eq-pin.latest circle.core{
+    animation: heartbeat 1.2s ease-in-out infinite;
+    transform-origin:center; transform-box: fill-box;
+    filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 12px var(--red));
+  }
+  @keyframes heartbeat{
+    0%, 100%{ transform:scale(1); }
+    10%{ transform:scale(2.1); }
+    22%{ transform:scale(1); }
+    32%{ transform:scale(1.7); }
+    44%{ transform:scale(1); }
+  }
+  .eq-pin.latest circle.halo{
+    fill:none; stroke:#fff; stroke-width:0.8; opacity:0.5;
+    animation: halo-pulse 1.2s ease-in-out infinite;
+    transform-origin:center; transform-box: fill-box;
+  }
+  @keyframes halo-pulse{ 0%,100%{ r:13; opacity:0.15;} 50%{ r:15; opacity:0.55;} }
+  .eq-pin.latest circle.sweep{
+    fill:none; stroke:#fff; stroke-width:2; opacity:1;
+    animation: sweep-ring 1.2s ease-out infinite;
+    transform-origin:center; transform-box: fill-box;
+  }
+  .eq-pin.latest circle.sweep2{
+    fill:none; stroke:var(--red); stroke-width:1.6; opacity:1;
+    animation: sweep-ring 1.2s ease-out infinite 0.4s;
+    transform-origin:center; transform-box: fill-box;
+  }
+  @keyframes sweep-ring{ 0%{ r:4; opacity:1; stroke-width:2.2;} 100%{ r:26; opacity:0; stroke-width:0.2;} }
+  .eq-pin.latest circle.crosshair, .eq-pin.latest line.crosshair{
+    fill:none; stroke:#fff; stroke-width:1; opacity:1;
+    filter: drop-shadow(0 0 3px #fff);
+  }
+  .latest-tag{
+    display:inline-block; margin-left:6px; padding:1px 7px; border:1px solid #fff; border-radius:2px;
+    font-size:9px; letter-spacing:0.1em; color:#04070a; background:#fff; vertical-align:middle;
+    animation: tag-blink 1.2s ease-in-out infinite; font-weight:700;
+    box-shadow: 0 0 8px #fff;
+  }
+  @keyframes tag-blink{ 0%,100%{ opacity:1;} 50%{ opacity:0.35;} }
+  .eq-row.latest{ border-color:#fff; box-shadow: 0 0 10px rgba(255,255,255,0.25); animation: row-glow 1.2s ease-in-out infinite; }
+  @keyframes row-glow{ 0%,100%{ box-shadow:0 0 4px rgba(255,255,255,0.15);} 50%{ box-shadow:0 0 14px rgba(255,255,255,0.5);} }
+  .seismic-list{ flex:1; min-width:220px; display:flex; flex-direction:column; gap:7px; max-height:340px; overflow-y:auto; }
+  .eq-row{
+    display:flex; align-items:center; gap:10px; padding:7px 9px; border:1px solid var(--edge);
+    border-radius:3px; font-size:12px; cursor:pointer; background: rgba(111,227,236,0.02);
+  }
+  .eq-row:hover{ border-color:var(--edge-bright); background: rgba(111,227,236,0.06); }
+  .eq-row .mag{
+    flex-shrink:0; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:12px; border:1px solid var(--amber); color:var(--amber);
+  }
+  .eq-row.major .mag{ border-color:var(--red); color:var(--red); }
+  .eq-row .info{ min-width:0; }
+  .eq-row .place{ color:var(--white); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .eq-row .when{ color:var(--dim); font-size:11px; }
+  .seismic-legend{ display:flex; gap:14px; font-size:10px; color:var(--dim); letter-spacing:0.06em; margin-top:10px; }
+  .seismic-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .seismic-legend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  /* ---------- air quality ---------- */
+  .aqi-row{ display:flex; align-items:center; gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid var(--edge); }
+  .aqi-badge{
+    flex-shrink:0; width:52px; height:52px; border-radius:50%; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; border:2px solid var(--cyan);
+  }
+  .aqi-badge .num{ font-size:16px; font-weight:700; line-height:1; }
+  .aqi-badge .lbl{ font-size:8px; color:var(--dim); letter-spacing:0.06em; }
+  .aqi-text{ font-size:12px; color:var(--dim); }
+  .aqi-text .level{ color:var(--white); font-weight:600; }
+  .aqi-text .pm{ font-size:11px; margin-top:2px; }
+
+  /* ---------- rainfall & flood risk ---------- */
+  .flood-panel{ margin-top:var(--gap); }
+  .flood-body{ display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
+  .flood-badge{
+    flex-shrink:0; width:100px; padding:10px 8px; text-align:center; border-radius:4px;
+    border:1px solid var(--edge-bright);
+  }
+  .flood-badge .rate{ font-size:20px; font-weight:700; line-height:1; }
+  .flood-badge .rate small{ font-size:10px; font-weight:400; color:var(--dim); }
+  .flood-badge .level{ font-size:10px; letter-spacing:0.08em; margin-top:6px; padding:2px 6px; border-radius:2px; display:inline-block; }
+  .flood-hazard{ flex:1; min-width:200px; font-size:12px; color:var(--dim); line-height:1.6; }
+  .flood-hazard .headline{ color:var(--white); font-weight:600; margin-bottom:4px; }
+  .flood-news{ margin-top:14px; padding-top:12px; border-top:1px solid var(--edge); }
+  .flood-news .label{ font-size:10px; letter-spacing:0.12em; color:var(--dim); margin-bottom:8px; }
+  .flood-news-item{
+    display:block; font-size:12px; color:var(--white); padding:6px 0; border-bottom:1px dashed rgba(111,227,236,0.12);
+    text-decoration:none;
+  }
+  .flood-news-item:last-child{ border-bottom:none; }
+  .flood-news-item:hover{ color:var(--cyan); }
+  .flood-news-item .src-tag{ color:var(--dim); font-size:10px; letter-spacing:0.06em; }
+
+  /* ---------- system unit wireframe ---------- */
+  .sysunit-panel{ margin-top:var(--gap); }
+  .sysunit-wrap{ overflow-x:auto; }
+  .su-svg{ width:100%; min-width:640px; height:auto; display:block; overflow:visible; }
+  .su-spine{ stroke:var(--edge-bright); stroke-width:1.5; stroke-dasharray:3 3; }
+  .su-stub{ stroke:var(--edge-bright); stroke-width:1.2; }
+  .su-node .box{ fill: rgba(111,227,236,0.04); stroke:var(--cyan-soft); stroke-width:1; }
+  .su-node .icon{ fill:none; stroke:var(--dim); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .su-node.good .box{ stroke:var(--cyan); }
+  .su-node.good .icon{ stroke:var(--cyan); filter: drop-shadow(0 0 3px rgba(111,227,236,0.6)); }
+  .su-node.warn .box{ stroke:var(--amber); }
+  .su-node.warn .icon{ stroke:var(--amber); }
+  .su-node.bad .box{ stroke:var(--edge); }
+  .su-node.bad .icon{ stroke:var(--dim); opacity:0.4; }
+  .su-dot{ r:3.5; }
+  .su-node.good .su-dot{ fill:var(--cyan); filter: drop-shadow(0 0 4px var(--cyan)); animation: su-blink 2s ease-in-out infinite; }
+  .su-node.warn .su-dot{ fill:var(--amber); }
+  .su-node.bad .su-dot{ fill:var(--dim); }
+  @keyframes su-blink{ 0%,100%{ opacity:1;} 50%{ opacity:0.4;} }
+  .su-label{ fill:var(--white); font-family:'Chakra Petch', sans-serif; font-size:9px; font-weight:600; letter-spacing:0.06em; }
+  .su-value{ fill:var(--dim); font-family:'Chakra Petch', sans-serif; font-size:8px; }
+  .su-node.good .su-value{ fill:var(--cyan-soft); }
+  .su-fan-group{ transform-origin: center; transform-box: fill-box; }
+  .su-legend{ display:flex; gap:16px; font-size:10px; color:var(--dim); letter-spacing:0.06em; margin-top:12px; flex-wrap:wrap; }
+  .su-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .su-legend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  footer{ text-align:center; color:var(--dim); font-size:11px; letter-spacing:0.1em; margin-top:34px; }
+</style>
+</head>
+<body>
+
+<div id="boot" aria-hidden="true">
+  <div class="boot-ring"></div>
+  <div class="boot-word">ODDYSEUS</div>
+  <div class="boot-sub">SYSTEM INITIALIZING</div>
+  <div class="boot-bar"></div>
+</div>
+
+<div class="code-rain" id="codeRain" aria-hidden="true"></div>
+<div class="bg-grid"></div>
+<div class="scan-line"></div>
+
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <h1>ODDYSEUS</h1>
+      <div class="tagline">DIAGNOSTIC &amp; SITUATIONAL AWARENESS INTERFACE</div>
+    </div>
+    <div class="status-pill"><span class="status-dot"></span> SYSTEM ONLINE</div>
+    <button class="btn-outline" id="trafficBtn" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17h1l1-5 2-6h8l2 6 1 5h1M6 17a2 2 0 1 0 0 .01M18 17a2 2 0 1 0 0 .01M4 12h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      TRAFFIC OVERLAY
+    </button>
+    <div class="clock-block">
+      <div class="clock-time" id="clockTime">--:--:--</div>
+      <div class="clock-date" id="clockDate">LOADING</div>
+    </div>
+  </header>
+
+  <div class="alert-banner" id="alertBanner"></div>
+
+  <div class="grid">
+    <!-- DIAGNOSTICS -->
+    <section class="panel" aria-labelledby="diagHead">
+      <h2 id="diagHead">SYSTEM DIAGNOSTICS <small>DEVICE READOUT</small></h2>
+      <div id="diagRows">
+        <div class="diag-row"><span class="diag-label">CONNECTION</span><span class="diag-value" id="dNet">—</span></div>
+        <div class="diag-row"><span class="diag-label">POWER CELL</span><span class="diag-value" id="dBattery">—</span></div>
+        <div class="diag-row"><span class="diag-label">PROCESSOR CORES</span><span class="diag-value" id="dCores">—</span></div>
+        <div class="diag-row"><span class="diag-label">MEMORY (EST.)</span><span class="diag-value" id="dMem">—</span></div>
+        <div class="diag-row"><span class="diag-label">DISPLAY</span><span class="diag-value" id="dScreen">—</span></div>
+        <div class="diag-row"><span class="diag-label">TIMEZONE</span><span class="diag-value" id="dTz">—</span></div>
+        <div class="diag-row"><span class="diag-label">LOCATION SOURCE</span><span class="diag-value" id="dGeo">DEFAULT</span></div>
+        <div class="diag-row"><span class="diag-label">SESSION UPTIME</span><span class="diag-value" id="dUptime">00:00:00</span></div>
+      </div>
+    </section>
+
+    <!-- CENTRAL HUB -->
+    <section class="panel hub" aria-labelledby="hubHead">
+      <h2 id="hubHead" style="align-self:flex-start;">CORE STATUS</h2>
+      <div class="hub-ring-wrap">
+        <div class="hub-spinner" aria-hidden="true"></div>
+        <svg viewBox="0 0 230 230">
+          <circle class="hub-track" cx="115" cy="115" r="100"></circle>
+          <circle class="hub-arc" id="hubArc" cx="115" cy="115" r="100" stroke-dasharray="628" stroke-dashoffset="628"></circle>
+        </svg>
+        <div class="hub-center">
+          <div class="label">LOCAL TIME</div>
+          <div class="value" id="hubTime">--:--</div>
+          <div class="sub" id="hubLoc">Mandaluyong, PH</div>
+        </div>
+      </div>
+      <div class="hub-caption">Monitoring <strong>weather</strong>, <strong>device diagnostics</strong>, and <strong>live Philippine headlines</strong> in real time.</div>
+    </section>
+
+    <!-- WEATHER -->
+    <section class="panel" aria-labelledby="wxHead">
+      <h2 id="wxHead">WEATHER <small id="wxPlace">MANDALUYONG CITY</small></h2>
+      <div class="wx-top-row">
+        <div id="wxBody">
+          <div class="news-status">Acquiring atmospheric data…</div>
+        </div>
+        <div class="city-map-wrap" aria-hidden="true">
+          <svg viewBox="0 0 213.6 170">
+            <path class="city-map-outline" d="M210.6,3.6 L211.7,18.5 L199.6,59.1 L211.4,53.3 L213.6,98.4 L205.7,94.8 L195.5,113.1 L200.9,117.5 L194.1,125.5 L198.9,140.9 L174.5,153.6 L166.7,153.4 L146.6,165.6 L132.2,163.8 L88.1,170.0 L48.8,138.2 L0.0,106.9 L0.9,98.7 L36.9,49.6 L47.0,27.2 L70.0,37.4 L72.5,44.4 L86.6,53.3 L129.8,39.2 L171.5,1.5 L194.1,4.5 L209.3,0.0 L210.6,3.6 Z"></path>
+            <defs>
+              <clipPath id="cityClip">
+                <path d="M210.6,3.6 L211.7,18.5 L199.6,59.1 L211.4,53.3 L213.6,98.4 L205.7,94.8 L195.5,113.1 L200.9,117.5 L194.1,125.5 L198.9,140.9 L174.5,153.6 L166.7,153.4 L146.6,165.6 L132.2,163.8 L88.1,170.0 L48.8,138.2 L0.0,106.9 L0.9,98.7 L36.9,49.6 L47.0,27.2 L70.0,37.4 L72.5,44.4 L86.6,53.3 L129.8,39.2 L171.5,1.5 L194.1,4.5 L209.3,0.0 L210.6,3.6 Z"></path>
+              </clipPath>
+            </defs>
+            <g class="city-map-grid" clip-path="url(#cityClip)">
+              <title>Stylized grid overlay — decorative only, not actual street data</title>
+              <line x1="0.0" y1="0" x2="0.0" y2="170"></line>
+              <line x1="14.0" y1="0" x2="14.0" y2="170"></line>
+              <line x1="28.0" y1="0" x2="28.0" y2="170"></line>
+              <line x1="42.0" y1="0" x2="42.0" y2="170"></line>
+              <line x1="56.0" y1="0" x2="56.0" y2="170"></line>
+              <line x1="70.0" y1="0" x2="70.0" y2="170"></line>
+              <line x1="84.0" y1="0" x2="84.0" y2="170"></line>
+              <line x1="98.0" y1="0" x2="98.0" y2="170"></line>
+              <line x1="112.0" y1="0" x2="112.0" y2="170"></line>
+              <line x1="126.0" y1="0" x2="126.0" y2="170"></line>
+              <line x1="140.0" y1="0" x2="140.0" y2="170"></line>
+              <line x1="154.0" y1="0" x2="154.0" y2="170"></line>
+              <line x1="168.0" y1="0" x2="168.0" y2="170"></line>
+              <line x1="182.0" y1="0" x2="182.0" y2="170"></line>
+              <line x1="196.0" y1="0" x2="196.0" y2="170"></line>
+              <line x1="210.0" y1="0" x2="210.0" y2="170"></line>
+              <line x1="0" y1="0.0" x2="213.6" y2="0.0"></line>
+              <line x1="0" y1="14.0" x2="213.6" y2="14.0"></line>
+              <line x1="0" y1="28.0" x2="213.6" y2="28.0"></line>
+              <line x1="0" y1="42.0" x2="213.6" y2="42.0"></line>
+              <line x1="0" y1="56.0" x2="213.6" y2="56.0"></line>
+              <line x1="0" y1="70.0" x2="213.6" y2="70.0"></line>
+              <line x1="0" y1="84.0" x2="213.6" y2="84.0"></line>
+              <line x1="0" y1="98.0" x2="213.6" y2="98.0"></line>
+              <line x1="0" y1="112.0" x2="213.6" y2="112.0"></line>
+              <line x1="0" y1="126.0" x2="213.6" y2="126.0"></line>
+              <line x1="0" y1="140.0" x2="213.6" y2="140.0"></line>
+              <line x1="0" y1="154.0" x2="213.6" y2="154.0"></line>
+              <line x1="0" y1="168.0" x2="213.6" y2="168.0"></line>
+            </g>
+            <g class="city-map-pin" transform="translate(143.9,79.8)">
+              <line class="crosshair" x1="-9" y1="0" x2="9" y2="0"></line>
+              <line class="crosshair" x1="0" y1="-9" x2="0" y2="9"></line>
+              <circle class="ring" r="4"></circle>
+              <circle class="ring2" r="4"></circle>
+              <circle class="core" r="3.6"></circle>
+              <title>Mandaluyong City Hall (approx.)</title>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="aqi-row" id="aqiRow" style="display:none;">
+        <div class="aqi-badge" id="aqiBadge"><span class="num" id="aqiNum">—</span><span class="lbl">AQI</span></div>
+        <div class="aqi-text"><div class="level" id="aqiLevel">—</div><div class="pm" id="aqiPm">—</div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- SYSTEM UNIT -->
+  <section class="panel sysunit-panel" aria-labelledby="sysunitHead">
+    <h2 id="sysunitHead">SYSTEM UNIT <small>LIVE DEVICE TELEMETRY</small></h2>
+    <div class="sysunit-wrap">
+      <svg class="su-svg" viewBox="0 0 720 224">
+        <line class="su-spine" x1="30" y1="112" x2="690" y2="112"></line>
+        <line class="su-stub" x1="60" y1="112" x2="60" y2="80"></line>
+        <line class="su-stub" x1="146" y1="112" x2="146" y2="144"></line>
+        <line class="su-stub" x1="231" y1="112" x2="231" y2="80"></line>
+        <line class="su-stub" x1="317" y1="112" x2="317" y2="144"></line>
+        <line class="su-stub" x1="403" y1="112" x2="403" y2="80"></line>
+        <line class="su-stub" x1="489" y1="112" x2="489" y2="144"></line>
+        <line class="su-stub" x1="574" y1="112" x2="574" y2="80"></line>
+        <line class="su-stub" x1="660" y1="112" x2="660" y2="144"></line>
+
+        <!-- CPU -->
+        <g class="su-node bad" id="suCPU" transform="translate(60,52)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-9" y="-9" width="18" height="18" rx="1"></rect>
+            <line x1="-4" y1="-9" x2="-4" y2="-13"></line><line x1="4" y1="-9" x2="4" y2="-13"></line>
+            <line x1="-4" y1="9" x2="-4" y2="13"></line><line x1="4" y1="9" x2="4" y2="13"></line>
+            <line x1="-9" y1="-4" x2="-13" y2="-4"></line><line x1="-9" y1="4" x2="-13" y2="4"></line>
+            <line x1="9" y1="-4" x2="13" y2="-4"></line><line x1="9" y1="4" x2="13" y2="4"></line>
+          </g>
+          <circle class="su-dot" cx="20" cy="-24"></circle>
+          <text class="su-label" x="0" y="42" text-anchor="middle">PROCESSOR</text>
+          <text class="su-value" id="suCPUval" x="0" y="53" text-anchor="middle">—</text>
+        </g>
+
+        <!-- RAM -->
+        <g class="su-node bad" id="suRAM" transform="translate(146,172)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-8" y="-10" width="6" height="20" rx="1"></rect>
+            <rect x="2" y="-10" width="6" height="20" rx="1"></rect>
+            <line x1="-8" y1="12" x2="-8" y2="15"></line><line x1="-3" y1="12" x2="-3" y2="15"></line>
+            <line x1="2" y1="12" x2="2" y2="15"></line><line x1="7" y1="12" x2="7" y2="15"></line>
+          </g>
+          <circle class="su-dot" cx="20" cy="24"></circle>
+          <text class="su-label" x="0" y="-38" text-anchor="middle">MEMORY</text>
+          <text class="su-value" id="suRAMval" x="0" y="-27" text-anchor="middle">—</text>
+        </g>
+
+        <!-- GPU -->
+        <g class="su-node bad" id="suGPU" transform="translate(231,52)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-11" y="-6" width="22" height="12" rx="1"></rect>
+            <circle cx="-4" cy="0" r="3"></circle>
+            <circle cx="4" cy="0" r="3"></circle>
+          </g>
+          <circle class="su-dot" cx="20" cy="-24"></circle>
+          <text class="su-label" x="0" y="42" text-anchor="middle">GRAPHICS</text>
+          <text class="su-value" id="suGPUval" x="0" y="53" text-anchor="middle">—</text>
+        </g>
+
+        <!-- STORAGE -->
+        <g class="su-node bad" id="suSTOR" transform="translate(317,172)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-9" y="-9" width="18" height="18" rx="2"></rect>
+            <line x1="-6" y1="-2" x2="6" y2="-2"></line>
+            <line x1="-6" y1="3" x2="6" y2="3"></line>
+          </g>
+          <circle class="su-dot" cx="20" cy="24"></circle>
+          <text class="su-label" x="0" y="-38" text-anchor="middle">STORAGE</text>
+          <text class="su-value" id="suSTORval" x="0" y="-27" text-anchor="middle">—</text>
+        </g>
+
+        <!-- NETWORK -->
+        <g class="su-node bad" id="suNET" transform="translate(403,52)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-8" y="2" width="4" height="6"></rect>
+            <rect x="-2" y="-3" width="4" height="11"></rect>
+            <rect x="4" y="-7" width="4" height="15"></rect>
+          </g>
+          <circle class="su-dot" cx="20" cy="-24"></circle>
+          <text class="su-label" x="0" y="42" text-anchor="middle">NETWORK</text>
+          <text class="su-value" id="suNETval" x="0" y="53" text-anchor="middle">—</text>
+        </g>
+
+        <!-- POWER -->
+        <g class="su-node bad" id="suPWR" transform="translate(489,172)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <path d="M -3,-10 L 4,-1 L -1,-1 L 3,10 L -5,0 L 0,0 Z"></path>
+          </g>
+          <circle class="su-dot" cx="20" cy="24"></circle>
+          <text class="su-label" x="0" y="-38" text-anchor="middle">POWER</text>
+          <text class="su-value" id="suPWRval" x="0" y="-27" text-anchor="middle">—</text>
+        </g>
+
+        <!-- DISPLAY -->
+        <g class="su-node bad" id="suDISP" transform="translate(574,52)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <rect x="-11" y="-8" width="22" height="14" rx="1"></rect>
+            <line x1="0" y1="6" x2="0" y2="10"></line>
+            <line x1="-5" y1="10" x2="5" y2="10"></line>
+          </g>
+          <circle class="su-dot" cx="20" cy="-24"></circle>
+          <text class="su-label" x="0" y="42" text-anchor="middle">DISPLAY</text>
+          <text class="su-value" id="suDISPval" x="0" y="53" text-anchor="middle">—</text>
+        </g>
+
+        <!-- ACTIVITY / FAN -->
+        <g class="su-node bad" id="suACT" transform="translate(660,172)">
+          <rect class="box" x="-28" y="-28" width="56" height="56" rx="6"></rect>
+          <g class="icon">
+            <circle cx="0" cy="0" r="10" fill="none"></circle>
+            <g class="su-fan-group" id="suFanBlades">
+              <path d="M 0,-2 Q 3,-6 0,-9 Q -3,-6 0,-2 Z"></path>
+              <path d="M 0,-2 Q 3,-6 0,-9 Q -3,-6 0,-2 Z" transform="rotate(90)"></path>
+              <path d="M 0,-2 Q 3,-6 0,-9 Q -3,-6 0,-2 Z" transform="rotate(180)"></path>
+              <path d="M 0,-2 Q 3,-6 0,-9 Q -3,-6 0,-2 Z" transform="rotate(270)"></path>
+            </g>
+          </g>
+          <circle class="su-dot" cx="20" cy="24"></circle>
+          <text class="su-label" x="0" y="-38" text-anchor="middle">ACTIVITY</text>
+          <text class="su-value" id="suACTval" x="0" y="-27" text-anchor="middle">—</text>
+        </g>
+      </svg>
+    </div>
+    <div class="su-legend">
+      <span><i style="background:var(--cyan)"></i>Detected &amp; reporting</span>
+      <span><i style="background:var(--amber)"></i>Partially available</span>
+      <span><i style="background:var(--dim)"></i>Not exposed by browser</span>
+    </div>
+  </section>
+
+  <!-- RAINFALL & FLOOD RISK -->
+  <section class="panel flood-panel" aria-labelledby="floodHead">
+    <h2 id="floodHead">RAINFALL &amp; FLOOD RISK <small>LIVE · PAGASA CRITERIA</small></h2>
+    <div class="flood-body" id="floodBody">
+      <div class="news-status">Reading rain gauges…</div>
+    </div>
+    <div class="flood-news">
+      <div class="label">FLOOD-RELATED HEADLINES IN CURRENT NEWS FEED</div>
+      <div id="floodNewsBody"><div class="news-status">Scanning headlines…</div></div>
+    </div>
+  </section>
+
+  <!-- SEISMIC -->
+  <section class="panel seismic-panel" aria-labelledby="seismicHead">
+    <h2 id="seismicHead">SEISMIC ACTIVITY <small>SOURCE: USGS · PHILIPPINE REGION</small></h2>
+    <div class="seismic-body" id="seismicBody">
+      <div class="news-status">Scanning fault lines…</div>
+    </div>
+  </section>
+
+  <!-- PAGASA -->
+  <section class="panel pagasa-panel" aria-labelledby="pagasaHead">
+    <h2 id="pagasaHead">PAGASA ADVISORY <small>DOST-PAGASA</small></h2>
+    <div class="pagasa-body" id="pagasaBody">
+      <div class="news-status">Contacting PAGASA…</div>
+    </div>
+  </section>
+
+  <!-- NEWS -->
+  <section class="panel news-panel" aria-labelledby="newsHead">
+    <h2 id="newsHead">LIVE FEED — PHILIPPINE HEADLINES <small id="newsSourceLabel">SOURCE: RAPPLER</small></h2>
+    <div class="src-picker" id="srcPicker">
+      <button class="src-btn active" data-src="rappler">RAPPLER</button>
+      <button class="src-btn" data-src="gma">GMA NEWS</button>
+      <button class="src-btn" data-src="inquirer">INQUIRER</button>
+    </div>
+    <div id="newsBody">
+      <div class="news-status">Establishing uplink…</div>
+    </div>
+  </section>
+
+  <footer>ODDYSEUS INTERFACE — BUILT FOR DK · CPDD MANDALUYONG — NOT AFFILIATED WITH MARVEL OR STARK INDUSTRIES</footer>
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h3 id="modalTitle">Headline</h3>
+      <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="modalDesc"></p>
+      <div class="video-wrap">
+        <iframe id="modalVideo" src="" title="Live Philippine news broadcast" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+      </div>
+      <div class="video-note">This story doesn't have a dedicated clip available through a free API, so the player shows ANC 24/7's live broadcast — tune in and this headline is likely being covered on air.</div>
+      <div class="video-note" style="margin-top:6px;">If the player above stays blank, your browser is blocking the embed — <a class="modal-link" href="https://www.youtube.com/channel/UCvi6hEzLM-Z_unKPSuuzKvg/live" target="_blank" rel="noopener">watch ANC 24/7 directly on YouTube →</a></div>
+      <br>
+      <a class="modal-link" id="modalLink" href="#" target="_blank" rel="noopener">Read the full article →</a>
+    </div>
+  </div>
+</div>
+
+<!-- TRAFFIC MODAL -->
+<div class="modal-backdrop traffic-modal" id="trafficBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="trafficTitle">
+    <div class="modal-head">
+      <h3 id="trafficTitle">Live Traffic Overlay</h3>
+      <button class="modal-close" id="trafficClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="map-wrap">
+        <iframe id="trafficIframe" src="" title="Live traffic map" loading="lazy"></iframe>
+      </div>
+      <div class="video-note" style="margin-top:10px;" id="trafficNote">Centered on your current location.</div>
+      <div class="video-note" style="margin-top:6px;">If the map above stays blank, your browser is blocking the embed — <a class="modal-link" id="trafficExternalLink" href="#" target="_blank" rel="noopener">open it directly in Google Maps →</a></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- background code rain (built from this page's own source) ---------- */
+  (function buildCodeRain(){
+    try{
+      var src = (document.currentScript && document.currentScript.textContent) || '';
+      if(!src){ var s = document.querySelector('script'); src = s ? s.textContent : ''; }
+      var lines = src.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 1; });
+      if(!lines.length) return;
+      var container = document.getElementById('codeRain');
+      if(!container) return;
+      var numCols = window.innerWidth < 700 ? 4 : 9;
+      var linesPerCol = 100;
+      for(var c=0; c<numCols; c++){
+        var offset = (c * 17) % lines.length;
+        var chunk = [];
+        for(var i=0; i<linesPerCol; i++){ chunk.push(lines[(offset+i) % lines.length]); }
+        var text = chunk.join('\n');
+        var col = document.createElement('div');
+        col.className = 'code-col' + (c % 2 ? ' rev' : '');
+        var track = document.createElement('div');
+        track.className = 'track';
+        track.style.animationDuration = (38 + c*6) + 's';
+        var pre1 = document.createElement('pre'); pre1.textContent = text;
+        var pre2 = document.createElement('pre'); pre2.textContent = text;
+        track.appendChild(pre1); track.appendChild(pre2);
+        col.appendChild(track);
+        container.appendChild(col);
+      }
+    }catch(e){ /* purely decorative — fail silently */ }
+  })();
+
+  /* ---------- boot ---------- */
+  var boot = document.getElementById('boot');
+  setTimeout(function(){ boot.classList.add('skip'); }, 3300);
+
+  /* ---------- clock ---------- */
+  var TZ = 'Asia/Manila';
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function tick(){
+    var now = new Date();
+    var timeFmt = new Intl.DateTimeFormat('en-PH', { timeZone: TZ, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }).format(now);
+    var dateFmt = new Intl.DateTimeFormat('en-PH', { timeZone: TZ, weekday:'long', year:'numeric', month:'long', day:'numeric' }).format(now);
+    document.getElementById('clockTime').textContent = timeFmt;
+    document.getElementById('clockDate').textContent = dateFmt.toUpperCase();
+    document.getElementById('hubTime').textContent = new Intl.DateTimeFormat('en-PH', { timeZone: TZ, hour:'2-digit', minute:'2-digit', hour12:false }).format(now);
+
+    // arc progress = fraction of day elapsed (PH time)
+    var parts = new Intl.DateTimeFormat('en-PH', { timeZone: TZ, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, hourCycle:'h23'}).formatToParts(now);
+    var h=0,m=0,s=0;
+    parts.forEach(function(p){ if(p.type==='hour') h=parseInt(p.value); if(p.type==='minute') m=parseInt(p.value); if(p.type==='second') s=parseInt(p.value); });
+    var frac = (h*3600+m*60+s)/86400;
+    var circumference = 628;
+    var arc = document.getElementById('hubArc');
+    arc.style.strokeDashoffset = (circumference * (1-frac)).toFixed(1);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  /* ---------- uptime ---------- */
+  var start = Date.now();
+  setInterval(function(){
+    var diff = Math.floor((Date.now()-start)/1000);
+    var hh = Math.floor(diff/3600), mm = Math.floor((diff%3600)/60), ss = diff%60;
+    document.getElementById('dUptime').textContent = pad(hh)+':'+pad(mm)+':'+pad(ss);
+  }, 1000);
+
+  /* ---------- diagnostics ---------- */
+  function setDiag(id, text, cls){
+    var el = document.getElementById(id);
+    el.textContent = text;
+    if(cls) el.classList.add(cls);
+  }
+
+  function updateNetwork(){
+    if(!navigator.onLine){ setDiag('dNet','OFFLINE','warn'); return; }
+    var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if(c && c.effectiveType){
+      setDiag('dNet', c.effectiveType.toUpperCase() + (c.downlink ? ' · ' + c.downlink + ' Mbps' : ''), 'good');
+    } else {
+      setDiag('dNet', 'ONLINE', 'good');
+    }
+  }
+  updateNetwork();
+  window.addEventListener('online', updateNetwork);
+  window.addEventListener('offline', updateNetwork);
+  if(navigator.connection) navigator.connection.addEventListener('change', updateNetwork);
+
+  if(navigator.getBattery){
+    navigator.getBattery().then(function(b){
+      function render(){
+        var pct = Math.round(b.level*100);
+        setDiag('dBattery', pct + '%' + (b.charging ? ' · CHARGING' : ''), pct < 20 && !b.charging ? 'warn' : 'good');
+      }
+      render();
+      b.addEventListener('levelchange', render);
+      b.addEventListener('chargingchange', render);
+    }).catch(function(){ setDiag('dBattery','UNAVAILABLE'); });
+  } else {
+    setDiag('dBattery','NOT SUPPORTED');
+  }
+
+  setDiag('dCores', (navigator.hardwareConcurrency || 'N/A') + (navigator.hardwareConcurrency ? ' THREADS' : ''));
+  setDiag('dMem', navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A');
+  setDiag('dScreen', screen.width + ' × ' + screen.height + ' px');
+  setDiag('dTz', Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+  /* ---------- system unit wireframe telemetry ---------- */
+  function suSet(id, status, value){
+    var node = document.getElementById(id);
+    if(!node) return;
+    node.classList.remove('good','warn','bad');
+    node.classList.add(status);
+    var val = document.getElementById(id+'val');
+    if(val) val.textContent = value;
+  }
+
+  // PROCESSOR
+  if(navigator.hardwareConcurrency){
+    suSet('suCPU', 'good', navigator.hardwareConcurrency + ' THREADS');
+  } else {
+    suSet('suCPU', 'bad', 'NOT EXPOSED');
+  }
+
+  // MEMORY (Chrome-family only; spec caps/rounds the value, so treat as approximate)
+  if(navigator.deviceMemory){
+    suSet('suRAM', 'warn', '~' + navigator.deviceMemory + ' GB (APPROX.)');
+  } else {
+    suSet('suRAM', 'bad', 'NOT EXPOSED');
+  }
+
+  // GRAPHICS (WebGL renderer string — many browsers mask/block this for fingerprinting)
+  (function(){
+    try{
+      var canvas = document.createElement('canvas');
+      var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      var dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      var renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : (gl ? gl.getParameter(gl.RENDERER) : null);
+      if(renderer){
+        var short = renderer.replace(/^ANGLE \(|\)$/g,'').split(',')[0].slice(0,26);
+        suSet('suGPU', dbg ? 'good' : 'warn', short);
+      } else if(gl){
+        suSet('suGPU', 'warn', 'WEBGL OK · MODEL HIDDEN');
+      } else {
+        suSet('suGPU', 'bad', 'WEBGL UNAVAILABLE');
+      }
+    }catch(e){ suSet('suGPU', 'bad', 'NOT EXPOSED'); }
+  })();
+
+  // STORAGE (browser quota/usage estimate — not real disk capacity)
+  if(navigator.storage && navigator.storage.estimate){
+    navigator.storage.estimate().then(function(est){
+      var usedMB = (est.usage/1048576).toFixed(0);
+      var quotaGB = (est.quota/1073741824).toFixed(1);
+      suSet('suSTOR', 'good', usedMB + 'MB / ' + quotaGB + 'GB QUOTA');
+    }).catch(function(){ suSet('suSTOR', 'bad', 'NOT EXPOSED'); });
+  } else {
+    suSet('suSTOR', 'bad', 'NOT EXPOSED');
+  }
+
+  // NETWORK
+  (function(){
+    var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if(!navigator.onLine){ suSet('suNET', 'bad', 'OFFLINE'); return; }
+    if(c && c.effectiveType){ suSet('suNET', 'good', c.effectiveType.toUpperCase() + (c.downlink ? ' · '+c.downlink+'Mbps' : '')); }
+    else { suSet('suNET', 'warn', 'ONLINE · TYPE N/A'); }
+  })();
+
+  // POWER (Battery API — deprecated/unsupported in many current desktop browsers)
+  if(navigator.getBattery){
+    navigator.getBattery().then(function(b){
+      suSet('suPWR', 'good', Math.round(b.level*100) + '%' + (b.charging?' CHG':''));
+    }).catch(function(){ suSet('suPWR', 'bad', 'NOT REPORTED'); });
+  } else {
+    suSet('suPWR', 'bad', 'NOT EXPOSED');
+  }
+
+  // DISPLAY (always synchronously available)
+  suSet('suDISP', 'good', screen.width + '×' + screen.height + ' @' + (window.devicePixelRatio||1) + 'x');
+
+  // ACTIVITY — real measured frame timing, driving both the readout and the fan speed
+  (function(){
+    var lastT = performance.now();
+    var samples = [];
+    var fanEl = document.getElementById('suFanBlades');
+    function frame(t){
+      var dt = t - lastT;
+      lastT = t;
+      samples.push(dt);
+      if(samples.length > 30) samples.shift();
+      var avg = samples.reduce(function(a,b){return a+b;},0) / samples.length;
+      var fps = Math.min(999, Math.round(1000/avg));
+      var status = 'good', spinSec = 1.2;
+      if(avg > 33){ status = 'warn'; spinSec = 2.4; }
+      if(avg > 60){ status = 'bad'; spinSec = 4; }
+      suSet('suACT', status, fps + ' FPS');
+      if(fanEl) fanEl.style.animation = 'spin ' + spinSec + 's linear infinite';
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  })();
+
+  /* ---------- weather ---------- */
+  var WX_ICONS = {
+    clear: '<svg viewBox="0 0 24 24" fill="none" stroke="#6fe3ec" stroke-width="1.6"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke-linecap="round"/></svg>',
+    cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="#6fe3ec" stroke-width="1.6"><path d="M6.5 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 16.5 8a4.5 4.5 0 0 1 .5 9H6.5Z" stroke-linejoin="round"/></svg>',
+    rain: '<svg viewBox="0 0 24 24" fill="none" stroke="#6fe3ec" stroke-width="1.6"><path d="M6.5 15a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 16.5 5a4.5 4.5 0 0 1 .5 9H6.5Z" stroke-linejoin="round"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2" stroke-linecap="round"/></svg>',
+    storm: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffb454" stroke-width="1.6"><path d="M6.5 13a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 16.5 3a4.5 4.5 0 0 1 .5 9H6.5Z" stroke-linejoin="round"/><path d="M13 14l-3 5h3l-2 4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    fog: '<svg viewBox="0 0 24 24" fill="none" stroke="#6fe3ec" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h10"/></svg>'
+  };
+  function wxDescribe(code){
+    var m = {
+      0:['Clear sky','clear'],1:['Mostly clear','clear'],2:['Partly cloudy','cloud'],3:['Overcast','cloud'],
+      45:['Fog','fog'],48:['Depositing fog','fog'],
+      51:['Light drizzle','rain'],53:['Drizzle','rain'],55:['Dense drizzle','rain'],
+      61:['Light rain','rain'],63:['Rain','rain'],65:['Heavy rain','rain'],
+      66:['Freezing rain','rain'],67:['Freezing rain','rain'],
+      80:['Rain showers','rain'],81:['Rain showers','rain'],82:['Violent showers','rain'],
+      95:['Thunderstorm','storm'],96:['Thunderstorm, hail','storm'],99:['Severe thunderstorm','storm']
+    };
+    return m[code] || ['Conditions nominal','cloud'];
+  }
+
+  var geo = { lat: 14.5794, lng: 121.0359, label: 'MANDALUYONG CITY', source: 'DEFAULT' };
+
+  function loadWeather(){
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lng+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&hourly=temperature_2m,weather_code&timezone=Asia%2FManila&forecast_days=1';
+    document.getElementById('wxPlace').textContent = geo.label;
+    fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      var cur = d.current;
+      var desc = wxDescribe(cur.weather_code);
+      var icon = WX_ICONS[desc[1]];
+
+      var nowHourIdx = new Date().getHours();
+      var hoursHtml = '';
+      for(var i=1;i<=6;i++){
+        var idx = nowHourIdx + i;
+        if(idx >= d.hourly.time.length) break;
+        var hLabel = new Date(d.hourly.time[idx]).toLocaleTimeString('en-PH',{hour:'numeric', hour12:true});
+        var hDesc = wxDescribe(d.hourly.weather_code[idx]);
+        hoursHtml += '<div class="hr"><div>'+hLabel.replace(' ','')+'</div>'+WX_ICONS[hDesc[1]]+'<div class="t">'+Math.round(d.hourly.temperature_2m[idx])+'°</div></div>';
+      }
+
+      document.getElementById('wxBody').innerHTML =
+        '<div class="wx-current"><div class="wx-icon">'+icon+'</div><div>' +
+        '<div class="wx-temp">'+Math.round(cur.temperature_2m)+'°C</div>' +
+        '<div class="wx-desc">'+desc[0]+' · Feels like '+Math.round(cur.apparent_temperature)+'°C</div>' +
+        '</div></div>' +
+        '<div class="wx-meta">' +
+          '<div class="item"><span class="k">HUMIDITY</span><span class="v">'+cur.relative_humidity_2m+'%</span></div>' +
+          '<div class="item"><span class="k">WIND</span><span class="v">'+Math.round(cur.wind_speed_10m)+' km/h</span></div>' +
+        '</div>' +
+        '<div class="wx-hourly">'+hoursHtml+'</div>';
+
+      updateFloodRisk(cur.precipitation || 0);
+    })
+    .catch(function(err){
+      console.error('ODDYSEUS weather fetch failed:', err);
+      document.getElementById('wxBody').innerHTML = '<div class="news-status">Weather uplink failed'+(err && err.message ? ' ('+err.message+')' : '')+'.<br><button class="retry-btn" id="wxRetry">RETRY</button></div>';
+      document.getElementById('floodBody').innerHTML = '<div class="news-status">Rainfall data unavailable.</div>';
+      var wr = document.getElementById('wxRetry');
+      if(wr) wr.addEventListener('click', loadWeather);
+    });
+    loadAQI();
+  }
+
+  /* ---------- rainfall & flood risk (computed live, PAGASA color-code criteria) ---------- */
+  function floodRiskLevel(mmPerHr){
+    if(mmPerHr >= 30) return { name:'RED', color:'var(--red)', bg:'rgba(255,77,77,0.15)',
+      hazard:'Intense rainfall (30mm+/hr). PAGASA criteria for a Red Rainfall Warning — serious flooding is likely in flood-prone and low-lying areas.' };
+    if(mmPerHr >= 15) return { name:'ORANGE', color:'var(--amber)', bg:'rgba(255,180,84,0.15)',
+      hazard:'Heavy rainfall (15–30mm/hr). PAGASA criteria for an Orange Rainfall Warning — flooding is threatening in flood-prone and low-lying areas.' };
+    if(mmPerHr >= 7.5) return { name:'YELLOW', color:'var(--amber)', bg:'rgba(255,180,84,0.1)',
+      hazard:'Moderate rainfall (7.5–15mm/hr). PAGASA criteria for a Yellow Rainfall Warning — be aware of possible flooding in flood-prone and low-lying areas.' };
+    return { name:'NONE', color:'var(--cyan)', bg:'rgba(111,227,236,0.08)',
+      hazard:'Current rainfall rate is below PAGASA\'s warning thresholds for your location.' };
+  }
+
+  function updateFloodRisk(mmPerHr){
+    var lvl = floodRiskLevel(mmPerHr);
+    document.getElementById('floodBody').innerHTML =
+      '<div class="flood-badge" style="background:'+lvl.bg+'; border-color:'+lvl.color+';">' +
+        '<div class="rate" style="color:'+lvl.color+';">'+mmPerHr.toFixed(1)+'<small> mm/hr</small></div>' +
+        '<div class="level" style="color:'+lvl.color+'; border:1px solid '+lvl.color+';">'+lvl.name+' WARNING'+(lvl.name==='NONE'?' LEVEL':'')+'</div>' +
+      '</div>' +
+      '<div class="flood-hazard"><div class="headline">'+(lvl.name==='NONE' ? 'No active rainfall warning criteria met' : lvl.name+' RAINFALL WARNING CRITERIA MET')+'</div>' + lvl.hazard + '</div>';
+
+    if(lvl.name === 'NONE'){
+      setAlertLine('rainfall', null);
+    } else {
+      setAlertLine('rainfall', {
+        label: lvl.name+' RAINFALL WARNING',
+        text: ' — ' + mmPerHr.toFixed(1) + 'mm/hr at ' + geo.label + '. ' + lvl.hazard,
+        href: 'https://www.pagasa.dost.gov.ph/'
+      });
+    }
+  }
+
+  /* ---------- air quality ---------- */
+  function aqiLevel(v){
+    if(v<=50) return ['Good', '#6fe3ec'];
+    if(v<=100) return ['Moderate', '#ffb454'];
+    if(v<=150) return ['Unhealthy (sensitive)', '#ffb454'];
+    if(v<=200) return ['Unhealthy', '#ff4d4d'];
+    if(v<=300) return ['Very Unhealthy', '#ff4d4d'];
+    return ['Hazardous', '#ff4d4d'];
+  }
+  function loadAQI(){
+    var url = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude='+geo.lat+'&longitude='+geo.lng+'&current=us_aqi,pm2_5,pm10';
+    fetch(url).then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+    .then(function(d){
+      var aqi = Math.round(d.current.us_aqi);
+      var lvl = aqiLevel(aqi);
+      document.getElementById('aqiRow').style.display = 'flex';
+      document.getElementById('aqiBadge').style.borderColor = lvl[1];
+      document.getElementById('aqiNum').textContent = aqi;
+      document.getElementById('aqiNum').style.color = lvl[1];
+      document.getElementById('aqiLevel').textContent = 'US AQI ' + aqi + ' · ' + lvl[0];
+      document.getElementById('aqiPm').textContent = 'PM2.5 ' + Math.round(d.current.pm2_5) + ' µg/m³ · PM10 ' + Math.round(d.current.pm10) + ' µg/m³';
+    })
+    .catch(function(){ document.getElementById('aqiRow').style.display = 'none'; });
+  }
+
+  /* ---------- geolocation ---------- */
+  function acquireLocation(){
+    if(!navigator.geolocation){ loadWeather(); return; }
+    navigator.geolocation.getCurrentPosition(function(pos){
+      geo.lat = pos.coords.latitude;
+      geo.lng = pos.coords.longitude;
+      geo.source = 'GPS';
+      setDiag('dGeo', 'GPS · ±'+Math.round(pos.coords.accuracy)+'m', 'good');
+      fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+geo.lat+'&longitude='+geo.lng+'&localityLanguage=en')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          geo.label = ((d.city || d.locality || '') + (d.principalSubdivision ? ', '+d.principalSubdivision : '')).toUpperCase() || 'YOUR LOCATION';
+          loadWeather();
+        })
+        .catch(function(){ geo.label = 'YOUR LOCATION'; loadWeather(); });
+    }, function(){
+      setDiag('dGeo', 'DENIED · USING DEFAULT', 'warn');
+      loadWeather();
+    }, { timeout: 6000, maximumAge: 300000 });
+  }
+  acquireLocation();
+
+  /* ---------- traffic overlay ---------- */
+  function openTraffic(){
+    var url = 'https://www.google.com/maps?q='+geo.lat+','+geo.lng+'&layer=traffic&z=13&output=embed';
+    document.getElementById('trafficIframe').src = url;
+    document.getElementById('trafficExternalLink').href = 'https://www.google.com/maps/@'+geo.lat+','+geo.lng+',13z/data=!5m1!1e1';
+    document.getElementById('trafficNote').textContent = geo.source === 'GPS'
+      ? 'Centered on your current location (' + geo.label.toLowerCase() + ').'
+      : 'Location access wasn\'t granted, so this is centered on Mandaluyong City.';
+    var bd = document.getElementById('trafficBackdrop');
+    bd.classList.remove('open'); void bd.offsetWidth;
+    bd.classList.add('open');
+  }
+  function closeTraffic(){
+    document.getElementById('trafficBackdrop').classList.remove('open');
+    document.getElementById('trafficIframe').src = '';
+  }
+  document.getElementById('trafficBtn').addEventListener('click', openTraffic);
+  document.getElementById('trafficClose').addEventListener('click', closeTraffic);
+  document.getElementById('trafficBackdrop').addEventListener('click', function(e){ if(e.target === this) closeTraffic(); });
+
+  /* ---------- seismic activity ---------- */
+  var PH_MAP_PROJ = { lonMin: 116.92886449600009, latMax: 19.387532855000078, cosMean: 0.9773518515102377, scale: 41.839946193661824, W: 395.7, H: 600 };
+  var PH_MAP_PATH = "M216.9,121.3 L225.1,108.4 L229.0,95.7 L224.5,94.1 L224.0,85.9 L217.4,84.6 L214.1,74.6 L214.1,55.1 L220.5,47.7 L220.5,42.2 L216.9,36.3 L214.2,36.2 L212.8,41.8 L203.6,46.8 L191.9,43.4 L173.1,32.0 L166.1,33.0 L164.8,38.7 L172.9,35.3 L178.2,41.8 L186.1,45.2 L185.3,56.0 L180.7,56.4 L179.5,65.8 L183.4,68.0 L186.8,75.2 L192.9,79.0 L188.3,87.5 L188.9,105.2 L180.3,108.7 L178.2,114.2 L165.8,117.9 L162.6,116.8 L162.0,123.5 L157.0,133.4 L161.2,136.8 L168.4,136.0 L173.6,138.0 L174.4,145.0 L178.3,151.5 L185.7,146.5 L209.8,120.4 L216.9,121.3 Z M216.9,121.3 L209.8,120.4 L185.7,146.5 L178.3,151.5 L174.4,145.0 L173.6,138.0 L168.4,136.0 L161.2,136.8 L163.2,143.1 L159.1,150.4 L156.1,148.0 L150.7,149.5 L149.7,147.5 L148.1,151.6 L141.1,152.3 L135.9,157.7 L131.5,149.0 L127.1,147.0 L124.9,149.7 L121.1,149.6 L120.2,152.8 L122.8,154.5 L122.1,160.0 L124.3,161.8 L121.1,165.5 L126.2,172.5 L129.0,192.5 L132.9,194.3 L134.1,188.8 L136.5,190.0 L135.7,196.4 L141.6,200.8 L141.5,206.2 L145.8,208.0 L150.5,205.4 L148.5,190.8 L164.2,196.6 L163.5,194.7 L167.6,192.7 L180.0,190.5 L183.5,174.5 L181.8,169.5 L185.9,166.1 L192.7,153.4 L189.6,151.4 L189.1,146.0 L196.7,138.9 L210.1,133.8 L211.2,130.7 L212.9,131.8 L208.7,139.6 L215.7,131.8 L216.9,121.3 Z M157.0,133.4 L162.0,123.5 L162.6,116.8 L165.8,117.9 L178.2,114.2 L180.3,108.7 L187.8,106.6 L189.7,103.7 L188.2,88.4 L192.9,79.0 L186.8,75.2 L183.4,68.0 L179.5,65.8 L180.7,56.4 L185.3,56.0 L186.1,45.2 L178.2,41.8 L172.9,35.3 L164.8,38.7 L163.2,59.9 L159.7,59.8 L149.4,66.5 L144.7,78.4 L149.7,79.3 L147.6,85.5 L153.3,89.1 L153.9,92.7 L158.8,93.4 L157.7,103.2 L152.6,103.7 L149.5,106.7 L150.1,110.8 L143.8,125.6 L146.5,132.1 L151.3,134.2 L157.0,133.4 Z M386.0,479.9 L385.3,476.4 L376.8,476.7 L372.3,479.3 L367.3,476.5 L366.9,479.3 L360.8,476.5 L345.6,476.3 L347.4,492.2 L342.7,492.0 L343.4,494.7 L340.9,494.7 L339.2,498.6 L341.3,502.6 L339.5,503.4 L339.4,510.9 L342.0,516.9 L336.2,524.4 L333.3,525.0 L332.0,532.2 L335.8,538.4 L334.5,541.9 L342.6,541.1 L344.8,537.7 L350.7,550.5 L352.1,557.2 L349.8,566.9 L343.7,578.7 L346.8,578.0 L358.7,559.1 L359.2,553.0 L354.1,539.7 L349.9,535.1 L345.9,534.9 L345.3,529.8 L350.0,518.9 L356.6,514.2 L358.6,506.0 L364.9,503.2 L366.2,513.0 L370.2,517.0 L370.0,521.3 L374.2,525.0 L374.4,537.9 L379.3,548.0 L381.5,528.5 L377.3,522.2 L378.4,523.5 L380.1,520.5 L383.3,526.4 L385.3,526.4 L382.5,521.2 L384.7,518.1 L389.7,518.4 L395.7,506.2 L393.5,505.1 L395.4,498.5 L394.3,488.2 L386.7,483.6 L386.0,479.9 Z M321.9,496.5 L319.4,493.6 L310.7,491.6 L304.1,508.4 L308.3,508.7 L310.4,516.9 L313.0,515.5 L312.1,513.2 L314.1,515.0 L314.9,513.0 L314.7,516.2 L317.0,517.8 L316.4,513.3 L318.9,512.8 L316.5,508.4 L318.5,507.7 L318.9,510.9 L321.2,509.8 L322.0,526.0 L328.1,527.3 L330.3,530.3 L321.3,534.8 L321.7,531.5 L315.1,523.0 L310.3,529.7 L300.6,531.0 L300.8,528.6 L290.5,529.1 L290.4,541.3 L299.1,553.3 L322.8,564.8 L333.0,566.1 L336.3,556.3 L341.2,556.6 L341.1,563.6 L337.1,567.9 L341.8,572.9 L343.0,578.2 L349.8,566.9 L352.1,557.2 L350.7,550.5 L344.8,537.7 L342.6,541.1 L334.5,541.9 L335.8,538.4 L332.0,532.2 L333.3,525.0 L336.2,524.4 L342.0,516.9 L339.2,509.5 L339.5,503.4 L341.3,502.6 L337.8,497.1 L328.9,501.5 L321.9,496.5 Z M386.0,479.9 L388.7,477.1 L389.6,466.4 L384.9,468.8 L383.9,467.1 L386.6,464.2 L384.0,461.7 L386.8,455.0 L376.8,454.3 L374.3,450.9 L380.8,447.4 L379.6,445.8 L384.6,441.3 L383.5,436.4 L377.4,430.2 L379.2,421.7 L373.3,424.9 L370.1,417.8 L366.6,417.3 L369.3,414.4 L368.1,415.5 L365.2,412.3 L356.4,409.2 L354.5,407.0 L355.4,403.2 L347.9,400.2 L346.1,407.1 L351.7,426.5 L351.5,434.1 L341.8,435.0 L338.5,430.7 L340.8,441.2 L339.8,448.8 L337.0,452.1 L340.7,452.2 L341.3,461.6 L347.8,471.9 L345.6,476.3 L360.8,476.5 L366.9,479.3 L367.3,476.5 L372.3,479.3 L376.8,476.7 L385.3,476.4 L386.0,479.9 Z M345.6,476.3 L347.8,471.9 L341.3,461.6 L340.7,452.2 L337.0,452.1 L339.8,448.8 L340.8,441.2 L338.5,430.7 L337.6,439.0 L334.5,441.6 L324.9,434.4 L321.0,435.6 L319.6,455.8 L312.8,454.7 L307.9,450.3 L304.9,451.7 L301.9,454.0 L298.6,467.2 L289.7,468.3 L283.0,471.8 L274.8,478.1 L273.7,482.9 L279.9,488.8 L287.5,488.0 L290.4,483.9 L287.8,481.5 L288.7,479.2 L293.3,477.9 L293.6,475.2 L302.7,473.4 L304.2,469.9 L308.8,469.7 L322.6,493.4 L321.6,498.0 L331.3,501.4 L336.8,497.0 L340.8,497.1 L340.9,494.7 L343.4,494.7 L342.7,492.0 L347.4,492.2 L345.6,476.3 Z M220.0,221.1 L218.5,215.1 L214.1,219.5 L220.6,224.5 L219.6,227.1 L214.9,225.6 L216.8,229.8 L205.1,225.9 L197.1,219.3 L197.5,215.1 L193.6,209.0 L191.2,198.1 L196.5,196.3 L191.1,190.8 L186.1,176.0 L183.5,174.5 L180.0,190.5 L170.5,193.2 L172.0,197.8 L170.4,201.6 L175.2,207.9 L176.4,204.4 L179.8,206.1 L179.3,213.4 L183.5,208.8 L185.7,211.7 L184.0,211.0 L178.9,216.9 L174.0,217.6 L170.2,210.5 L166.8,210.6 L165.2,205.5 L162.0,206.4 L162.1,204.8 L157.0,211.5 L151.1,214.3 L149.3,219.9 L151.1,220.9 L152.3,234.9 L155.0,228.4 L161.5,229.5 L163.6,234.6 L161.8,238.2 L167.0,234.7 L169.7,241.4 L173.8,240.3 L178.2,242.3 L184.3,239.7 L185.6,232.4 L194.9,228.8 L195.7,226.6 L199.9,227.9 L206.6,233.5 L211.3,234.4 L215.9,242.0 L223.8,245.3 L228.5,252.6 L227.9,256.9 L231.9,260.5 L236.1,257.9 L235.0,251.4 L230.5,244.2 L233.3,245.1 L227.7,240.1 L228.4,233.1 L224.5,227.8 L239.8,224.8 L225.9,219.1 L223.1,222.6 L220.0,221.1 Z M270.9,450.7 L268.2,449.4 L268.8,447.2 L263.8,446.1 L265.3,449.4 L262.8,449.8 L260.6,454.6 L249.5,456.0 L245.7,463.6 L248.1,467.5 L244.5,470.4 L237.3,471.8 L234.5,469.7 L231.5,472.8 L216.6,478.1 L211.0,487.2 L213.2,494.3 L210.4,496.5 L208.6,503.3 L210.0,505.9 L203.3,512.3 L205.3,520.1 L212.0,522.9 L213.9,521.8 L219.2,504.8 L223.4,502.1 L221.8,499.0 L227.2,495.8 L228.1,494.1 L225.2,494.5 L225.6,492.9 L233.3,485.7 L240.5,487.0 L240.7,500.1 L244.4,495.5 L247.7,499.1 L250.1,490.7 L253.1,488.1 L256.3,493.7 L252.4,493.0 L253.0,496.8 L255.4,498.8 L257.3,495.9 L260.5,496.0 L261.8,500.9 L266.6,502.8 L266.7,500.1 L262.1,495.3 L268.0,489.8 L265.7,484.1 L273.5,483.7 L275.5,481.0 L274.8,475.6 L271.2,475.4 L270.9,450.7 Z M165.3,33.8 L162.8,34.4 L160.0,30.9 L156.7,35.5 L151.1,35.2 L148.6,37.5 L150.0,44.1 L144.8,54.5 L144.3,65.3 L142.1,66.7 L143.4,69.3 L140.0,73.3 L139.7,76.3 L144.4,82.8 L142.2,91.1 L144.0,100.0 L139.3,106.7 L139.4,112.9 L136.9,115.9 L139.5,128.9 L142.9,134.9 L139.0,138.8 L131.5,140.1 L129.5,135.2 L122.1,130.8 L122.5,125.7 L116.6,128.8 L116.0,144.8 L119.6,143.3 L121.6,149.8 L124.9,149.7 L127.1,147.0 L131.5,149.0 L135.9,157.7 L141.1,152.3 L148.1,151.6 L149.7,147.5 L150.7,149.5 L156.1,148.0 L159.1,150.4 L163.2,143.1 L160.0,134.7 L146.5,132.1 L143.8,125.6 L150.1,110.8 L149.5,106.7 L152.6,103.7 L157.7,103.2 L158.8,93.4 L153.9,92.7 L153.3,89.1 L147.6,85.5 L149.7,79.3 L144.7,78.4 L149.4,66.5 L164.3,58.2 L165.3,50.4 L163.1,46.1 L165.3,33.8 Z M300.0,285.6 L305.1,300.9 L311.1,306.7 L315.7,307.3 L325.7,319.5 L331.9,319.6 L328.4,326.6 L322.9,329.8 L329.4,333.2 L329.1,338.9 L336.2,339.4 L339.7,347.3 L342.2,345.0 L351.0,347.5 L352.1,344.6 L353.6,346.4 L357.1,345.0 L361.2,349.9 L357.2,342.6 L354.6,341.2 L355.0,343.0 L351.9,342.8 L355.9,336.0 L350.7,332.1 L348.0,325.2 L350.2,322.8 L347.0,319.3 L349.4,317.5 L347.3,312.0 L351.1,306.6 L347.9,303.9 L351.1,301.0 L345.6,296.4 L342.0,297.0 L343.7,292.0 L342.0,289.5 L333.6,284.7 L333.1,286.7 L325.4,284.9 L316.8,287.8 L300.0,285.6 Z M229.9,227.7 L234.7,233.3 L241.3,236.5 L241.1,240.4 L243.7,243.1 L256.0,249.1 L261.6,259.0 L260.1,261.1 L261.3,267.0 L265.7,265.6 L275.0,272.7 L276.5,270.6 L278.3,273.7 L283.2,271.5 L284.4,268.2 L290.4,268.6 L289.9,272.4 L283.3,272.5 L283.0,278.9 L288.7,286.2 L293.1,285.8 L295.5,275.3 L294.0,271.1 L297.0,264.7 L293.8,264.5 L292.5,267.2 L284.2,261.3 L281.5,265.0 L279.2,264.6 L279.9,257.7 L283.8,257.4 L269.9,243.1 L272.3,236.7 L282.0,238.3 L287.9,236.9 L286.8,234.0 L280.3,231.8 L277.8,228.1 L276.2,230.5 L266.8,226.9 L265.9,228.5 L261.8,221.5 L261.2,223.4 L258.7,222.4 L257.6,225.3 L260.4,228.4 L262.2,226.6 L260.0,229.9 L261.3,234.1 L253.0,236.8 L250.2,234.9 L252.1,230.1 L249.9,221.2 L242.1,213.6 L235.5,211.0 L235.3,213.5 L226.6,211.2 L221.0,217.2 L221.5,220.7 L219.6,222.4 L223.1,222.6 L225.9,219.1 L239.8,224.8 L229.9,227.7 Z M210.8,329.2 L208.5,338.4 L209.6,349.5 L204.2,360.8 L206.5,364.5 L203.8,374.1 L205.7,375.5 L216.0,366.0 L231.1,364.0 L232.4,360.4 L237.4,359.9 L239.3,351.4 L244.9,348.3 L246.3,349.5 L249.4,344.0 L253.5,343.4 L252.2,339.4 L254.2,335.3 L254.1,326.2 L244.3,332.7 L245.4,329.4 L241.1,325.4 L236.8,325.5 L232.7,329.3 L228.1,326.2 L226.1,327.9 L227.2,326.9 L223.7,323.9 L227.6,325.6 L223.1,320.2 L210.7,315.9 L205.4,311.6 L201.0,319.1 L210.8,320.6 L210.8,329.2 Z M10.8,462.6 L18.2,456.0 L23.4,455.5 L26.0,448.3 L33.2,447.7 L43.9,439.6 L48.8,428.6 L57.8,427.2 L64.1,421.8 L74.9,406.7 L72.7,406.1 L72.1,402.4 L75.4,404.1 L74.8,395.6 L92.8,390.8 L97.9,379.9 L108.0,377.2 L114.0,371.5 L111.1,364.5 L108.0,364.9 L108.7,357.8 L106.5,358.7 L104.5,356.2 L105.2,350.6 L107.9,350.9 L105.2,345.3 L107.9,338.7 L105.1,333.4 L100.1,343.6 L102.1,345.1 L101.6,349.4 L98.4,346.8 L99.6,350.7 L97.1,350.7 L99.4,356.2 L103.3,357.6 L103.5,362.5 L93.7,353.3 L95.3,355.5 L93.4,357.4 L98.7,362.0 L97.7,368.1 L94.4,370.0 L95.1,372.5 L90.4,376.8 L88.7,372.6 L87.7,376.1 L84.1,375.7 L83.4,377.6 L85.5,378.1 L82.3,380.6 L82.1,384.2 L76.8,384.7 L76.8,391.6 L74.3,388.3 L68.6,398.1 L57.7,407.5 L49.0,420.3 L44.7,424.4 L40.0,423.7 L34.6,427.7 L33.5,431.7 L30.1,431.5 L25.3,436.4 L13.3,451.1 L10.8,462.6 Z M169.5,295.0 L171.4,295.4 L171.1,298.9 L176.5,300.4 L177.9,297.1 L180.6,295.5 L182.7,297.1 L182.2,293.9 L184.6,294.2 L184.3,287.8 L189.3,283.8 L185.9,276.7 L186.4,266.6 L188.9,262.2 L184.4,261.0 L184.4,257.8 L174.5,249.1 L169.0,250.4 L165.0,245.2 L156.8,247.8 L139.7,246.1 L138.3,249.7 L141.4,251.6 L144.5,249.9 L147.1,257.6 L152.1,259.2 L155.5,264.6 L157.8,278.4 L162.4,281.6 L163.4,287.9 L169.5,295.0 Z M321.9,496.5 L322.1,492.2 L308.8,469.7 L304.2,469.9 L302.7,473.4 L293.6,475.2 L293.3,477.9 L288.7,479.2 L289.2,487.2 L283.1,487.5 L283.1,489.1 L289.6,491.2 L294.4,499.6 L299.8,502.9 L297.6,503.5 L295.6,511.0 L291.9,512.2 L289.3,516.4 L288.2,528.0 L300.8,528.6 L300.6,531.0 L310.3,529.7 L315.1,523.0 L321.7,531.5 L321.3,534.8 L330.3,530.3 L328.1,527.3 L322.0,526.0 L321.2,509.8 L318.9,510.9 L318.5,507.7 L316.5,508.4 L318.9,512.8 L316.4,513.3 L317.0,517.8 L314.7,516.2 L314.9,513.0 L314.1,515.0 L312.1,513.2 L313.0,515.5 L310.4,516.9 L308.3,508.7 L304.1,508.4 L310.7,491.6 L319.4,493.6 L321.9,496.5 Z M262.0,376.8 L266.6,371.6 L271.5,359.5 L269.3,354.3 L256.3,350.8 L246.5,355.3 L246.3,364.1 L239.9,370.9 L242.7,377.0 L242.5,388.9 L234.2,393.8 L225.9,393.8 L223.0,399.3 L222.9,405.0 L231.0,415.9 L247.6,396.4 L256.0,381.9 L254.2,374.6 L262.0,376.8 Z M331.4,353.7 L329.2,334.2 L322.8,333.2 L318.0,338.1 L313.1,338.2 L310.5,332.7 L308.3,332.3 L308.4,334.9 L302.5,327.7 L301.0,328.4 L303.1,337.6 L305.2,338.6 L304.5,354.1 L306.3,353.1 L306.9,355.6 L310.3,356.4 L313.6,350.4 L321.2,360.4 L322.0,365.2 L318.7,372.3 L321.5,379.4 L320.8,386.8 L325.7,387.8 L330.8,392.4 L328.8,377.0 L331.1,377.4 L335.2,385.9 L335.4,381.2 L340.7,381.4 L340.7,377.4 L337.4,374.5 L337.6,367.9 L330.5,361.0 L331.4,353.7 Z M262.0,376.8 L254.2,374.6 L256.0,381.9 L247.6,396.4 L231.6,415.2 L234.9,418.7 L242.7,420.9 L245.6,431.0 L248.9,433.0 L256.5,430.7 L261.0,422.1 L252.7,408.3 L254.8,405.0 L254.3,397.3 L259.8,387.4 L262.0,376.8 Z M266.6,411.8 L273.1,398.0 L274.5,389.2 L290.0,376.7 L289.4,360.9 L291.4,356.0 L290.9,348.7 L288.7,347.7 L291.4,339.2 L286.9,343.2 L285.9,353.0 L277.5,372.0 L263.4,393.0 L264.7,396.7 L260.5,417.1 L266.6,411.8 Z M311.9,400.1 L310.3,398.8 L312.5,397.6 L311.5,391.1 L304.2,386.4 L297.7,386.0 L291.7,389.9 L290.3,394.1 L283.7,396.5 L280.3,402.3 L283.6,404.7 L284.2,408.4 L299.8,409.6 L305.5,407.3 L309.0,402.8 L312.5,404.0 L311.9,400.1 Z M258.0,283.9 L260.0,291.5 L257.2,299.4 L260.6,300.2 L257.2,303.5 L254.8,313.0 L265.7,300.7 L270.0,300.2 L278.1,312.0 L285.8,314.7 L291.9,320.8 L292.0,315.3 L288.9,309.3 L291.3,310.4 L284.9,300.5 L280.9,298.9 L280.3,300.9 L276.8,295.3 L272.3,294.4 L270.9,289.7 L266.4,287.5 L261.6,290.6 L263.2,286.3 L258.0,283.9 Z M274.2,475.6 L283.7,469.8 L283.6,462.9 L278.8,451.5 L273.1,448.4 L271.8,451.8 L270.9,450.7 L271.1,474.2 L274.2,475.6 Z M297.6,221.2 L294.4,222.9 L294.1,235.8 L290.2,239.5 L297.7,245.6 L298.7,242.9 L302.5,243.9 L303.4,240.1 L305.9,239.6 L306.2,231.3 L300.9,227.8 L297.6,221.2 Z M204.0,531.9 L200.4,531.8 L199.1,535.1 L202.0,536.1 L205.5,543.1 L214.8,541.0 L216.0,535.8 L220.8,534.0 L213.5,532.1 L209.7,528.7 L209.1,536.5 L205.5,536.6 L204.0,531.9 Z M126.2,309.1 L130.2,310.1 L131.0,307.8 L138.0,309.8 L139.2,305.3 L134.6,300.4 L134.3,303.6 L132.2,304.0 L120.7,295.4 L122.0,297.5 L119.4,302.1 L121.4,300.7 L126.2,309.1 Z M208.4,258.9 L213.5,251.7 L212.4,248.0 L207.7,244.3 L204.0,245.3 L201.9,243.4 L200.1,252.9 L208.4,258.9 Z M178.1,566.0 L182.3,564.0 L183.6,560.3 L174.9,560.3 L171.4,556.4 L167.1,556.6 L161.3,562.0 L163.3,564.7 L167.4,563.2 L169.5,565.3 L176.0,562.6 L178.1,566.0 Z M356.3,373.0 L351.1,379.3 L352.2,384.2 L349.5,387.5 L350.9,390.2 L354.0,389.4 L353.3,393.2 L357.5,398.9 L358.9,397.0 L356.9,395.0 L358.5,390.8 L356.3,373.0 Z M207.4,303.8 L210.1,301.8 L213.6,281.5 L207.4,284.1 L207.6,290.6 L204.5,294.6 L204.4,297.1 L208.1,299.2 L206.9,301.2 L205.9,299.3 L207.4,303.8 Z M204.7,181.1 L200.7,181.9 L199.3,186.3 L203.8,192.1 L204.9,199.2 L208.9,195.4 L206.1,187.4 L208.2,186.9 L207.7,184.2 L209.7,185.0 L204.7,181.1 Z M117.9,596.8 L119.9,600.0 L124.0,598.7 L127.3,594.4 L132.5,594.1 L134.7,596.8 L135.9,590.4 L132.8,587.6 L117.9,596.8 Z M170.5,193.2 L167.6,192.7 L162.7,196.1 L165.9,202.0 L166.8,210.6 L168.8,209.6 L172.0,197.8 L170.5,193.2 Z M228.4,375.6 L235.3,371.8 L237.0,366.0 L234.3,361.2 L228.3,368.4 L229.6,370.2 L226.8,372.7 L228.4,375.6 Z M305.1,325.8 L308.1,331.4 L313.9,330.5 L311.1,322.6 L303.3,322.5 L305.1,325.8 Z M229.6,287.9 L224.7,291.0 L233.1,297.8 L235.8,292.0 L234.1,288.8 L229.6,287.9 Z M373.8,390.4 L369.0,399.1 L372.2,403.4 L377.6,401.7 L374.8,398.9 L373.8,390.4 Z M248.0,260.6 L245.3,262.5 L246.3,265.9 L250.9,267.3 L263.9,279.8 L259.6,271.9 L255.6,270.7 L248.0,260.6 Z M123.3,323.4 L127.5,321.0 L128.6,315.0 L120.9,310.0 L121.0,311.9 L119.3,311.3 L122.4,318.8 L125.2,317.6 L123.3,323.4 Z M273.7,280.1 L272.6,283.8 L280.5,294.9 L277.9,283.4 L273.7,280.1 Z M117.6,374.3 L122.0,372.9 L120.9,369.9 L123.0,371.5 L125.3,368.1 L118.5,365.6 L117.1,369.9 L115.1,370.1 L117.6,374.3 Z M273.3,422.0 L266.8,426.6 L272.3,430.6 L277.0,428.6 L273.3,422.0 Z M3.7,484.7 L6.4,480.2 L5.6,473.1 L1.5,474.2 L0.0,479.2 L3.7,484.7 Z M361.3,522.8 L362.7,513.5 L358.9,510.0 L357.2,514.4 L361.3,522.8 Z M317.7,423.9 L315.1,425.5 L315.5,428.2 L321.1,431.1 L321.0,426.1 L317.7,423.9 Z M338.4,392.6 L340.9,396.6 L341.5,393.1 L338.7,387.4 L335.2,386.0 L335.1,389.1 L338.4,392.6 Z M208.7,529.1 L204.0,531.9 L204.7,536.3 L209.1,536.5 L208.7,529.1 Z M187.4,6.0 L187.9,0.0 L180.7,1.0 L187.4,6.0 Z M307.0,362.7 L304.8,365.6 L302.1,363.1 L300.3,367.9 L309.6,365.8 L307.0,362.7 Z M136.6,239.2 L136.0,234.1 L129.3,231.1 L129.6,234.3 L136.6,239.2 Z M204.5,215.5 L206.8,220.8 L214.9,225.2 L204.5,215.5 Z M241.4,506.7 L246.3,504.0 L245.4,500.4 L243.1,502.7 L240.4,500.4 L241.4,506.7 Z M201.5,24.1 L207.0,18.4 L205.1,16.1 L202.1,17.0 L201.5,24.1 Z";
+
+  function projectLatLng(lat, lng){
+    var x = (lng - PH_MAP_PROJ.lonMin) * PH_MAP_PROJ.cosMean * PH_MAP_PROJ.scale;
+    var y = (PH_MAP_PROJ.latMax - lat) * PH_MAP_PROJ.scale;
+    return { x: x, y: y };
+  }
+
+  function eqTimeAgo(ts){
+    var diffMs = Date.now() - ts;
+    var mins = Math.round(diffMs/60000);
+    if(mins < 60) return mins + 'm ago';
+    var hrs = Math.round(mins/60);
+    if(hrs < 24) return hrs + 'h ago';
+    return Math.round(hrs/24) + 'd ago';
+  }
+
+  function loadSeismic(){
+    var since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
+    var url = 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime='+since+
+      '&minlatitude=4.5&maxlatitude=21&minlongitude=116&maxlongitude=127&minmagnitude=2.5&orderby=time&limit=25';
+    fetch(url).then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+    .then(function(d){
+      var feats = d.features || [];
+      if(!feats.length) throw new Error('empty');
+
+      var pinsHtml = '';
+      var rowsHtml = '';
+      feats.forEach(function(f, i){
+        var mag = f.properties.mag;
+        var lng = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+        var p = projectLatLng(lat, lng);
+        var major = mag >= 5;
+        var latest = (i === 0);
+        var extraCircles = latest
+          ? '<circle class="halo" r="13"></circle><circle class="sweep" r="4"></circle><circle class="sweep2" r="4"></circle><line class="crosshair" x1="-11" y1="0" x2="11" y2="0"></line><line class="crosshair" x1="0" y1="-11" x2="0" y2="11"></line>'
+          : '';
+        pinsHtml += '<g class="eq-pin'+(major?' major':'')+(latest?' latest':'')+'" data-idx="'+i+'" transform="translate('+p.x.toFixed(1)+','+p.y.toFixed(1)+')">' +
+          extraCircles +
+          '<circle class="ring" r="3"></circle><circle class="core" r="'+(2+Math.min(mag,6)*0.9).toFixed(1)+'"></circle>' +
+          '<title>'+(latest?'LATEST — ':'')+'M'+mag.toFixed(1)+' — '+f.properties.place+'</title></g>';
+        rowsHtml += '<div class="eq-row'+(major?' major':'')+(latest?' latest':'')+'" data-idx="'+i+'">' +
+          '<div class="mag">'+mag.toFixed(1)+'</div>' +
+          '<div class="info"><div class="place">'+f.properties.place+(latest?'<span class="latest-tag">LATEST</span>':'')+'</div><div class="when">'+eqTimeAgo(f.properties.time)+' · '+(f.geometry.coordinates[2]||0).toFixed(0)+'km deep</div></div>' +
+          '</div>';
+      });
+
+      document.getElementById('seismicBody').innerHTML =
+        '<div class="seismic-map-wrap"><svg viewBox="0 0 '+PH_MAP_PROJ.W+' '+PH_MAP_PROJ.H+'">' +
+          '<path class="ph-outline" d="'+PH_MAP_PATH+'"></path>' + pinsHtml +
+        '</svg>' +
+        '<div class="seismic-legend"><span><i style="background:var(--amber)"></i>M2.5–4.9</span><span><i style="background:var(--red)"></i>M5.0+</span></div>' +
+        '</div>' +
+        '<div class="seismic-list">'+rowsHtml+'</div>';
+
+      function highlight(idx){
+        document.querySelectorAll('.eq-pin').forEach(function(p){ p.style.opacity = (idx === -1) ? '' : ((+p.dataset.idx === idx) ? '1' : '0.35'); });
+        document.querySelectorAll('.eq-row').forEach(function(r){ if(!r.classList.contains('latest')) r.style.borderColor = (+r.dataset.idx === idx) ? 'var(--cyan)' : ''; });
+      }
+      document.querySelectorAll('.eq-row').forEach(function(row){
+        row.addEventListener('mouseenter', function(){ highlight(+row.dataset.idx); });
+        row.addEventListener('mouseleave', function(){ highlight(-1); });
+      });
+      document.querySelectorAll('.eq-pin').forEach(function(pin){
+        pin.addEventListener('mouseenter', function(){ highlight(+pin.dataset.idx); });
+        pin.addEventListener('mouseleave', function(){ highlight(-1); });
+      });
+    })
+    .catch(function(){
+      document.getElementById('seismicBody').innerHTML =
+        '<div class="news-status">Seismic uplink unavailable (USGS network covers the Philippine region but not PHIVOLCS\' full local sensor count — no official PHIVOLCS public API exists).<br>' +
+        '<button class="retry-btn" id="seismicRetry">RETRY</button> ' +
+        '<a class="modal-link" href="https://earthquake.phivolcs.dost.gov.ph/" target="_blank" rel="noopener" style="margin-left:10px;">Open PHIVOLCS directly →</a></div>';
+      var rb = document.getElementById('seismicRetry');
+      if(rb) rb.addEventListener('click', loadSeismic);
+    });
+  }
+  loadSeismic();
+  setInterval(loadSeismic, 2*60*1000);
+
+  /* ---------- multi-source alert banner ---------- */
+  var activeAlerts = {}; // key -> {label, text, href}
+  function setAlertLine(key, data){
+    if(data){ activeAlerts[key] = data; } else { delete activeAlerts[key]; }
+    renderAlertBanner();
+  }
+  function renderAlertBanner(){
+    var banner = document.getElementById('alertBanner');
+    var keys = Object.keys(activeAlerts);
+    if(!keys.length){ banner.classList.remove('show'); banner.innerHTML = ''; return; }
+    banner.innerHTML = keys.map(function(k){
+      var a = activeAlerts[k];
+      return '<div class="alert-line"><span class="dot"></span><span><strong>'+a.label+'</strong>'+a.text+'</span>' +
+        (a.href ? '<a href="'+a.href+'" target="_blank" rel="noopener">DETAILS →</a>' : '') + '</div>';
+    }).join('');
+    banner.classList.add('show');
+  }
+
+  /* ---------- pagasa advisory (best-effort) ---------- */
+  var ALERT_KEYWORDS = /(signal no\.?\s*[1-5]|tropical cyclone wind signal|tcws|typhoon|tropical storm|tropical depression|rainfall warning|flood warning|flash flood|landslide warning|storm surge|red warning|orange warning|yellow warning)/i;
+
+  function loadPagasa(){
+    var proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.pagasa.dost.gov.ph/');
+    fetch(proxy).then(function(r){ if(!r.ok) throw new Error('bad'); return r.text(); })
+    .then(function(html){
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var candidates = Array.from(doc.querySelectorAll('h1, h2, h3, .elementor-heading-title'))
+        .map(function(el){ return el.textContent.trim(); })
+        .filter(function(t){ return t.length > 12 && t.length < 220; });
+      var headline = candidates.length ? candidates[0] : null;
+      if(!headline) throw new Error('no headline found');
+      document.getElementById('pagasaBody').innerHTML =
+        '<div class="pagasa-badge"><div class="n">⚠</div><div class="l">LATEST BULLETIN</div></div>' +
+        '<div class="pagasa-text">' + headline + '<br><a href="https://www.pagasa.dost.gov.ph/" target="_blank" rel="noopener">View full advisory on PAGASA →</a></div>';
+      if(ALERT_KEYWORDS.test(headline)){
+        setAlertLine('pagasa', { label: 'PAGASA ADVISORY', text: ' — ' + headline, href: 'https://www.pagasa.dost.gov.ph/' });
+      } else {
+        setAlertLine('pagasa', null);
+      }
+    })
+    .catch(function(){
+      document.getElementById('pagasaBody').innerHTML =
+        '<div class="pagasa-text">Live bulletin scrape unavailable right now. PAGASA doesn\'t publish a public API, so this pulls best-effort from their homepage.<br>' +
+        '<a href="https://www.pagasa.dost.gov.ph/" target="_blank" rel="noopener">Open PAGASA directly →</a> ' +
+        '<button class="retry-btn" id="pagasaRetry" style="margin-left:8px;">RETRY</button></div>';
+      var rb = document.getElementById('pagasaRetry');
+      if(rb) rb.addEventListener('click', loadPagasa);
+      setAlertLine('pagasa', null);
+    });
+  }
+  loadPagasa();
+  setInterval(loadPagasa, 15*60*1000);
+
+  /* ---------- news ---------- */
+  var ANC_LIVE = 'https://www.youtube.com/embed/live_stream?channel=UCvi6hEzLM-Z_unKPSuuzKvg&autoplay=1';
+  var FEEDS = {
+    rappler: { url: 'https://www.rappler.com/feed/', label: 'SOURCE: RAPPLER' },
+    gma: { url: 'https://www.gmanetwork.com/rss', label: 'SOURCE: GMA NEWS' },
+    inquirer: { url: 'https://www.inquirer.net/fullfeed', label: 'SOURCE: INQUIRER' }
+  };
+  var currentSrc = 'rappler';
+  document.querySelectorAll('.src-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if(btn.dataset.src === currentSrc) return;
+      currentSrc = btn.dataset.src;
+      document.querySelectorAll('.src-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      document.getElementById('newsSourceLabel').textContent = FEEDS[currentSrc].label;
+      document.getElementById('newsBody').innerHTML = '<div class="news-status">Establishing uplink…</div>';
+      loadNews();
+    });
+  });
+
+  function stripHtml(html){
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    return (tmp.textContent || tmp.innerText || '').trim();
+  }
+  function timeAgo(dateStr){
+    var diffMs = Date.now() - new Date(dateStr).getTime();
+    var mins = Math.round(diffMs/60000);
+    if(mins < 60) return mins + 'm ago';
+    var hrs = Math.round(mins/60);
+    if(hrs < 24) return hrs + 'h ago';
+    return Math.round(hrs/24) + 'd ago';
+  }
+
+  function openModal(item){
+    document.getElementById('modalTitle').textContent = item.title;
+    var desc = stripHtml(item.description).slice(0, 260);
+    document.getElementById('modalDesc').textContent = desc + (desc.length===260 ? '…' : '');
+    document.getElementById('modalVideo').src = ANC_LIVE;
+    document.getElementById('modalLink').href = item.link;
+    var bd = document.getElementById('modalBackdrop');
+    bd.classList.remove('open'); void bd.offsetWidth;
+    bd.classList.add('open');
+    document.getElementById('modalClose').focus();
+  }
+  function closeModal(){
+    document.getElementById('modalBackdrop').classList.remove('open');
+    document.getElementById('modalVideo').src = '';
+  }
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalBackdrop').addEventListener('click', function(e){ if(e.target === this) closeModal(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Escape') return;
+    closeModal();
+    closeTraffic();
+  });
+
+  function renderNews(items){
+    var srcName = FEEDS[currentSrc].label.replace('SOURCE: ', '');
+    var html = '<div class="news-grid">';
+    items.slice(0,8).forEach(function(item, i){
+      html += '<button class="news-card" data-idx="'+i+'">' +
+        '<span class="src">'+srcName+'</span>' +
+        '<h3>'+ (item.title.length > 90 ? item.title.slice(0,90)+'…' : item.title) +'</h3>' +
+        '<span class="when">'+ timeAgo(item.pubDate) +' · Tap to view live coverage</span>' +
+        '</button>';
+    });
+    html += '</div>';
+    document.getElementById('newsBody').innerHTML = html;
+    document.querySelectorAll('.news-card').forEach(function(btn){
+      btn.addEventListener('click', function(){ openModal(items[+btn.dataset.idx]); });
+    });
+    scanFloodHeadlines(items, srcName);
+  }
+
+  /* ---------- flood-related headline scan (over currently loaded news feed) ---------- */
+  var FLOOD_KEYWORDS = /(flood|flooding|baha|pagbaha|overflow|submerged|storm surge|landslide|evacuat)/i;
+  function scanFloodHeadlines(items, srcName){
+    var hits = items.filter(function(it){ return FLOOD_KEYWORDS.test(it.title); }).slice(0, 4);
+    var body = document.getElementById('floodNewsBody');
+    if(!hits.length){
+      body.innerHTML = '<div class="news-status">No flood-related headlines in the current '+srcName+' feed right now.</div>';
+      setAlertLine('flood-news', null);
+      return;
+    }
+    body.innerHTML = hits.map(function(it){
+      return '<a class="flood-news-item" href="'+it.link+'" target="_blank" rel="noopener">'+it.title+' <span class="src-tag">— '+srcName+' · '+timeAgo(it.pubDate)+'</span></a>';
+    }).join('');
+    setAlertLine('flood-news', {
+      label: 'FLOOD HEADLINE',
+      text: ' — ' + hits[0].title + ' (' + srcName + ')',
+      href: hits[0].link
+    });
+  }
+
+  function loadNews(){
+    var feed = FEEDS[currentSrc];
+    var feedUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feed.url);
+    fetch(feedUrl).then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+    .then(function(d){
+      if(d.status !== 'ok' || !d.items || !d.items.length) throw new Error('empty');
+      renderNews(d.items);
+    })
+    .catch(function(){
+      document.getElementById('newsBody').innerHTML =
+        '<div class="news-status">Live headline uplink unavailable right now (feed service may be rate-limited).<br>' +
+        '<button class="retry-btn" id="newsRetry">RETRY</button> ' +
+        '<a class="modal-link" href="'+feed.url+'" target="_blank" rel="noopener" style="margin-left:10px;">Open source directly →</a></div>';
+      var rb = document.getElementById('newsRetry');
+      if(rb) rb.addEventListener('click', loadNews);
+    });
+  }
+  loadNews();
+  setInterval(loadNews, 10*60*1000); // refresh every 10 min
+  setInterval(loadWeather, 10*60*1000);
+
+})();
+</script>
+</body>
+</html>
